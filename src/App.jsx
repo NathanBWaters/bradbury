@@ -424,28 +424,111 @@ export default function App() {
     );
   }
 
-  async function handleElevenReaderShare(item) {
-    const cleanUrl = `${window.location.origin}${item.staticUrl || ''}`;
-    const shareData = {
-      title: `${item.title} — Bradbury 1000`,
-      text: `Read or listen to "${item.title}" (${item.author || item.region}) on Bradbury 1000.`,
-      url: cleanUrl
-    };
+  function formatFullPlainTextForElevenReader(item, includeAnalysis = true) {
+    const headerLines = [
+      `${item.title}`,
+      item.author
+        ? `By ${item.author} (${item.year} • ${item.era})`
+        : `${item.region} — ${item.subtitle} (${item.era})`,
+      ''
+    ];
 
+    if (item.epigraph) {
+      headerLines.push(item.epigraph, '');
+    }
+
+    let bodyText = '';
+    if (Array.isArray(item.fullText)) {
+      bodyText = item.fullText.join('\n\n');
+    } else if (typeof item.fullText === 'string') {
+      bodyText = item.fullText;
+    } else if (Array.isArray(item.paragraphs)) {
+      bodyText = item.paragraphs.join('\n\n');
+    }
+
+    const sections = [...headerLines, bodyText];
+
+    if (includeAnalysis && Array.isArray(item.analysis) && item.analysis.length > 0) {
+      sections.push(
+        '',
+        '---',
+        'Five-Paragraph Literary and Historical Analysis',
+        ''
+      );
+      item.analysis.forEach((sec) => {
+        sections.push(`${sec.heading}\n${sec.paragraph}`, '');
+      });
+    }
+
+    if (Array.isArray(item.sources) && item.sources.length > 0) {
+      sections.push('Primary and Historical Sources:');
+      item.sources.forEach((src) => {
+        sections.push(`• ${src.title} — ${src.author || ''} (${src.year || ''})`);
+      });
+    }
+
+    return sections.join('\n');
+  }
+
+  async function handleElevenReaderShare(item, mode = 'text') {
+    const includeAnalysis = userState.profile.includeAnalysisInEpub !== false;
+    const fullTextPayload = formatFullPlainTextForElevenReader(item, includeAnalysis);
+
+    // If user requested EPUB file share on mobile (or if mode === 'epub')
+    if (mode === 'epub' && navigator.share && navigator.canShare) {
+      try {
+        const blob = buildEpubBlob({
+          title: `${item.title} — ${item.author || item.region}`,
+          subtitle: `${item.slotLabel} • ${item.genre || item.category}`,
+          author: item.author || `${item.region} Cultural Chronicle`,
+          uid: `urn:bradbury1000:item:${item.id}`,
+          includeAnalysis,
+          chapters: [{ slotLabel: item.slotLabel, item }]
+        });
+        const safeSlug = item.title
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '');
+        const file = new File([blob], `${safeSlug}.epub`, {
+          type: 'application/epub+zip'
+        });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            title: `${item.title} — ${item.author || item.region}`,
+            files: [file]
+          });
+          showToastMessage(`Shared "${item.title}.epub" directly to ElevenReader!`);
+          return;
+        }
+      } catch {
+        // fall through to text share
+      }
+    }
+
+    // Share the ENTIRE full text + 5-paragraph analysis in `text` (without a competing short description)
+    // so ElevenReader iOS/Android immediately imports and narrates the complete story/poem/essay!
     if (navigator.share) {
       try {
-        await navigator.share(shareData);
-        showToastMessage(`Opened native Share Sheet for ElevenReader handoff!`);
+        await navigator.share({
+          title: `${item.title} — ${item.author || item.region}`,
+          text: fullTextPayload
+        });
+        showToastMessage(
+          `Sent full text & 5-paragraph analysis of "${item.title}" to ElevenReader!`
+        );
         return;
       } catch {
-        // fallback to clipboard
+        // user canceled or desktop fallback
       }
     }
 
     try {
-      await navigator.clipboard.writeText(cleanUrl);
-      showToastMessage(`Copied clean ElevenReader article URL (${cleanUrl}) to clipboard!`);
+      await navigator.clipboard.writeText(fullTextPayload);
+      showToastMessage(
+        `Copied complete text & 5-paragraph analysis of "${item.title}" to clipboard for ElevenReader!`
+      );
     } catch {
+      const cleanUrl = `${window.location.origin}${item.staticUrl || ''}`;
       window.open(cleanUrl, '_blank', 'noopener,noreferrer');
     }
   }
