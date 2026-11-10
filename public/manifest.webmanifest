@@ -1,0 +1,55 @@
+{
+  "name": "Bradbury 1000 — Nightly Literary Companion",
+  "short_name": "Bradbury 1000",
+  "description": "1 Poem, 1 Short Story, 1 Essay & 1 Korea/San Francisco Chronicle every night for 1,000 nights, with 5-paragraph literary analyses and ElevenReader EPUB handoff.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f9f4eb",
+  "theme_color": "#fbf8f1",
+  "categories": ["books", "education", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Tonight's Short Story",
+      "short_name": "Short Story",
+      "description": "Jump straight to unread canonical short stories",
+      "url": "/?category=story",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Tonight's Poem",
+      "short_name": "Poem",
+      "description": "Jump straight to unread classic verse",
+      "url": "/?category=poem",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Korea & SF Chronicles",
+      "short_name": "Korea & SF",
+      "description": "Explore 20 Korea & San Francisco historical deep-dives",
+      "url": "/?category=personal",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

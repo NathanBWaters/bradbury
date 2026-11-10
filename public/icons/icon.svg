@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="96" fill="#241a14"/>
+  <rect x="28" y="28" width="456" height="456" rx="76" fill="none" stroke="#d49a35" stroke-width="6" opacity="0.85"/>
+  <!-- Stylized Flame above Open Book -->
+  <path d="M256 96 C256 96 326 162 326 226 C326 268 294 298 256 298 C218 298 186 268 186 226 C186 162 256 96 256 96 Z" fill="#d95f18"/>
+  <path d="M256 154 C256 154 294 196 294 234 C294 258 277 276 256 276 C235 276 218 258 218 234 C218 196 256 154 256 154 Z" fill="#f6c453"/>
+  <!-- Open Folio Pages -->
+  <path d="M126 324 C174 308 224 316 256 336 C288 316 338 308 386 324 L386 392 C338 376 288 384 256 404 C224 384 174 376 126 392 Z" fill="#f8f2e6"/>
+  <text x="256" y="452" text-anchor="middle" font-family="Georgia, serif" font-size="38" fill="#f6c453" letter-spacing="3">1000</text>
+</svg>

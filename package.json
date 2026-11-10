@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "node scripts/prebakeStaticPages.mjs && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test tests/unit/bradbury.test.mjs",
+    "test:e2e": "node tests/e2e/mobileIntegrationRunner.mjs round5"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
