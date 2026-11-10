@@ -163,6 +163,26 @@ function renderItemBodyHtml(item, slotLabel, includeAnalysis = true) {
     `;
   }
 
+  let sourcesHtml = '';
+  if (Array.isArray(item.sources) && item.sources.length > 0) {
+    sourcesHtml = `
+      <hr class="divider" />
+      <section class="sources-section">
+        <h2>Primary &amp; Historical Sources</h2>
+        <ul>
+          ${item.sources
+            .map(
+              (src) =>
+                `<li><strong>${escapeXml(src.title)}</strong> — ${escapeXml(src.author || '')} (${escapeXml(
+                  src.year || ''
+                )})</li>`
+            )
+            .join('\n')}
+        </ul>
+      </section>
+    `;
+  }
+
   return `<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
@@ -182,6 +202,7 @@ function renderItemBodyHtml(item, slotLabel, includeAnalysis = true) {
       ${bodyHtml}
     </div>
     ${analysisHtml}
+    ${sourcesHtml}
   </div>
 </body>
 </html>`;

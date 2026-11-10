@@ -68,6 +68,25 @@ function renderStaticArticleHtml({ night, slotKey, slotLabel, item }) {
     </section>`
     : '';
 
+  const sourcesContent = Array.isArray(item.sources)
+    ? `
+    <hr />
+    <section class="analysis">
+      <h2>Primary &amp; Historical Sources</h2>
+      ${item.sources
+        .map(
+          (src) => `
+        <div class="analysis-item">
+          <h3>${escapeHtml(src.title)}</h3>
+          <p>${escapeHtml(src.author || '')} ${src.year ? `(${escapeHtml(src.year)})` : ''} ${
+            src.url ? `— <a href="${escapeHtml(src.url)}">${escapeHtml(src.url)}</a>` : ''
+          }</p>
+        </div>`
+        )
+        .join('\n')}
+    </section>`
+    : '';
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -186,6 +205,7 @@ function renderStaticArticleHtml({ night, slotKey, slotLabel, item }) {
         ${bodyContent}
       </div>
       ${analysisContent}
+      ${sourcesContent}
     </article>
   </main>
 </body>

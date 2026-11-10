@@ -6,7 +6,6 @@ import {
   BookOpen,
   Download,
   Share2,
-  RefreshCw,
   CheckCircle2,
   Circle,
   Sparkles,
@@ -22,36 +21,86 @@ import {
   FileText,
   MapPin,
   Clock,
-  Check
+  Check,
+  Feather,
+  ScrollText
 } from 'lucide-react';
 import poemsAndEssays from './data/poemsAndEssays.json';
 import storiesAndPlaces from './data/storiesAndPlaces.json';
 import { buildEpubBlob, downloadEpubBlob } from './utils/epubGenerator.js';
-import {
-  loadUserState,
-  saveUserState,
-  evaluateNightStatus,
-  recomputeStreakSummary
-} from './utils/streakEngine.js';
 
-const METAPHOR_COLLISION_NOTES = {
-  1: 'Night 1 collides British Romanticism (Shelley’s ruined desert empire) with Russian Realism (Chekhov’s fifteen-year solitary wager), Renaissance Empiricism (Bacon on disciplined reading), Joseon Dynasty linguistic engineering (King Sejong’s secret creation of Hangul), and 1849 Gold Rush maritime archaeology (the buried ships beneath San Francisco’s Financial District).',
-  2: 'Night 2 pairs Emily Dickinson’s quiet carriage ride into eternity with Kate Chopin’s fierce sixty-minute awakening, Emerson’s transcendental "transparent eyeball," Admiral Yi Sun-sin’s 13 turtle and panokseon warships in the Myeongnyang whirlpools, and San Francisco’s beloved self-proclaimed monarch, Emperor Norton I.',
-  3: 'Night 3 contrasts Robert Frost’s snowy New England woods with Edgar Allan Poe’s claustrophobic Gothic floorboards, Michel de Montaigne’s Renaissance study on the untamed mind, the free-diving matriarchal Haenyeo of volcanic Jeju Island, and the mechanical physics of Andrew Hallidie’s 1873 San Francisco cable cars.',
-  4: 'Night 4 ignites William Blake’s fearful symmetry alongside Guy de Maupassant’s Parisian diamond irony, William James’s neuroplastic psychology of habit, Seoul’s daylighting of the buried Cheonggyecheon stream, and the 1906 San Francisco earthquake & A.P. Giannini’s barrel-top bank.',
-  5: 'Night 5 brings W. B. Yeats’s post-war apocalyptic gyre together with O. Henry’s sacrificial Christmas fable, Virginia Woolf’s fierce defense of independent readers, the golden crowns and astronomical towers of ancient Silla in Gyeongju, and Lawrence Ferlinghetti’s City Lights Bookstore & the Howl obscenity trial in North Beach.',
-  6: 'Weekend Boss Night 6 expands into visionary scale: Coleridge’s opium-dreamed Xanadu, H. G. Wells’s cosmic planetary close-call ("The Star"), Thoreau’s manifesto on wild sauntering, the microbiology of Korean Onggi breathing jars and communal Gimjang fermentation, and the impossible engineering of the Golden Gate Bridge in International Orange.',
-  7: 'Weekend Boss Night 7 delves into obsession and deep time: Poe’s midnight Raven, Kafka’s parable of the Hunger Artist & the Law, T. H. Huxley tracing deep geological oceans inside a piece of carpenter’s chalk, Korea’s 1377 Jikji movable metal type & 81,258 Tripitaka woodblocks, and the glass ruins of Adolph Sutro’s Baths at Lands End.',
-  8: 'Night 8 bends perception and craft: Keats’s frozen Grecian urn, Ambrose Bierce’s split-second temporal dilation at Owl Creek Bridge, G. K. Chesterton’s defense of everyday wonder, Seoul’s Euljiro labyrinth of 1960s machine shops and neon speakeasies, and Look Tin Eli’s architectural reinvention of San Francisco’s Chinatown.',
-  9: 'Night 9 explores voice, spirit, and fermentation: Walt Whitman stepping out from the lecture hall into the mystical night air, Virginia Woolf’s lyrical ghost story, Bertrand Russell on how philosophy liberates us from the prison of prejudice, Korean Pansori’s one-drum vocal storytelling & Han/Heung, and the wild Gold Rush microbiology of San Francisco sourdough & Mission murals.',
-  10: 'Night 10 closes the initial 10-Night arc by revealing the hidden machinery behind art and nature: Matthew Arnold’s retreating sea of faith at Dover Beach, Saki’s wickedly framed Edwardian tall tale, Poe reverse-engineering his own creative method, the seasonal thermodynamics of Bukchon Hanok’s Ondol & Maru floors, and the Pacific wind-tunnel physics of Karl the Fog.'
+const STORAGE_KEY = 'bradbury_1000_user_state_v2';
+
+const DEFAULT_USER_STATE = {
+  profile: {
+    name: 'Nathan Waters',
+    email: 'watersnathan1@gmail.com',
+    elevenReaderToken: '',
+    includeAnalysisInEpub: true,
+    theme: 'parchment'
+  },
+  // Map of item.id -> { completed: true, completedAt: ISOString, categoryKey: 'poem' | 'story' | 'essay' | 'personal' }
+  completedItems: {},
+  externalLogs: []
 };
 
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return DEFAULT_USER_STATE;
+    const parsed = JSON.parse(raw);
+    return {
+      ...DEFAULT_USER_STATE,
+      ...parsed,
+      profile: { ...DEFAULT_USER_STATE.profile, ...(parsed.profile || {}) },
+      completedItems: { ...(parsed.completedItems || {}) },
+      externalLogs: Array.isArray(parsed.externalLogs) ? parsed.externalLogs : []
+    };
+  } catch {
+    return DEFAULT_USER_STATE;
+  }
+}
+
+function saveState(state) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+const MAIN_CATEGORIES = [
+  {
+    key: 'poem',
+    label: 'Poem',
+    subtitle: 'Classic Unabridged Verse + 5-Para Analysis',
+    icon: Feather
+  },
+  {
+    key: 'story',
+    label: 'Short Story',
+    subtitle: 'Verbatim Canonical Fiction + 5-Para Analysis',
+    icon: BookOpen
+  },
+  {
+    key: 'essay',
+    label: 'Essay',
+    subtitle: 'Verbatim Classical Essays + 5-Para Commentary',
+    icon: ScrollText
+  },
+  {
+    key: 'personal',
+    label: 'Personal (Korea & SF)',
+    subtitle: '10 Korea & 10 San Francisco Deep-Dives + Real Sources',
+    icon: Compass
+  }
+];
+
 export default function App() {
-  const [userState, setUserState] = useState(() => loadUserState());
-  const [activeTab, setActiveTab] = useState('tonight'); // 'tonight' | 'places' | 'curriculum' | 'library'
-  const [activeReader, setActiveReader] = useState(null); // { night, slotKey, item, slotLabel }
-  const [placeFilter, setPlaceFilter] = useState('all'); // 'all' | 'Korea' | 'San Francisco'
+  const [userState, setUserState] = useState(() => loadState());
+  const [selectedCategory, setSelectedCategory] = useState('story'); // 'poem' | 'story' | 'essay' | 'personal'
+  const [selectedSubcategory, setSelectedSubcategory] = useState('All');
+  const [activeReader, setActiveReader] = useState(null); // { item, categoryKey, slotLabel }
   const [showExternalModal, setShowExternalModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [toast, setToast] = useState(null);
@@ -68,10 +117,9 @@ export default function App() {
     setToast(msg);
     setTimeout(() => {
       setToast((prev) => (prev === msg ? null : prev));
-    }, 4200);
+    }, 4000);
   };
 
-  // Sync theme to document root
   useEffect(() => {
     document.documentElement.setAttribute(
       'data-theme',
@@ -79,12 +127,85 @@ export default function App() {
     );
   }, [userState.profile.theme]);
 
-  // Persist user state
   useEffect(() => {
-    saveUserState(userState);
+    saveState(userState);
   }, [userState]);
 
-  // Support URL hash / path routing for clean reader links (e.g., #/read/day-1/story or ?read=1:story)
+  // Reset genre subcategory filter to 'All' when switching main category
+  const handleSelectCategory = (catKey) => {
+    setSelectedCategory(catKey);
+    setSelectedSubcategory('All');
+    if (activeReader) {
+      closeReader();
+    }
+  };
+
+  // Normalize all pools with clean genre subcategories
+  const allItemsByCategory = useMemo(() => {
+    const poems = (poemsAndEssays.poems || []).map((p, idx) => ({
+      ...p,
+      categoryKey: 'poem',
+      slotLabel: 'Poem',
+      nightNumber: p.night || idx + 1,
+      staticUrl: `/read/day-${p.night || ((idx % 10) + 1)}/poem`,
+      subcategory: p.genre || p.era || 'Lyric Poetry'
+    }));
+
+    const stories = (storiesAndPlaces.stories || []).map((s, idx) => ({
+      ...s,
+      categoryKey: 'story',
+      slotLabel: 'Short Story',
+      nightNumber: s.night || idx + 1,
+      staticUrl: `/read/day-${s.night || ((idx % 10) + 1)}/story`,
+      subcategory: s.genre || s.era || 'Literary Fiction'
+    }));
+
+    const essays = (poemsAndEssays.essays || []).map((e, idx) => ({
+      ...e,
+      categoryKey: 'essay',
+      slotLabel: 'Essay',
+      nightNumber: e.night || idx + 1,
+      staticUrl: `/read/day-${e.night || ((idx % 10) + 1)}/essay`,
+      subcategory: e.genre || e.era || 'Classical Essay'
+    }));
+
+    const korea = (storiesAndPlaces.koreaStories || []).map((k, idx) => ({
+      ...k,
+      categoryKey: 'personal',
+      slotLabel: 'Korea Deep-Dive',
+      nightNumber: k.night || idx + 1,
+      staticUrl: `/read/day-${k.night || idx + 1}/korea`,
+      subcategory: `Korea • ${k.category || 'History & Culture'}`,
+      regionGroup: 'Korea'
+    }));
+
+    const sf = (storiesAndPlaces.sfStories || []).map((s, idx) => ({
+      ...s,
+      categoryKey: 'personal',
+      slotLabel: 'San Francisco Deep-Dive',
+      nightNumber: s.night || idx + 1,
+      staticUrl: `/read/day-${s.night || idx + 1}/sf`,
+      subcategory: `San Francisco • ${s.category || 'History & Culture'}`,
+      regionGroup: 'San Francisco'
+    }));
+
+    // Interleave Korea and SF 1..10 so both appear equally
+    const personal = [];
+    const maxLen = Math.max(korea.length, sf.length);
+    for (let i = 0; i < maxLen; i++) {
+      if (korea[i]) personal.push(korea[i]);
+      if (sf[i]) personal.push(sf[i]);
+    }
+
+    return {
+      poem: poems,
+      story: stories,
+      essay: essays,
+      personal
+    };
+  }, []);
+
+  // Support URL hash / path routing for clean reader links
   useEffect(() => {
     const parseLocationForReader = () => {
       const pathMatch = window.location.pathname.match(/\/read\/day-(\d+)\/([a-z]+)/i);
@@ -93,216 +214,221 @@ export default function App() {
       if (match) {
         const nightNum = Math.max(1, Math.min(10, parseInt(match[1], 10) || 1));
         const slotKey = match[2].toLowerCase();
-        openReaderByNightAndSlot(nightNum, slotKey, false);
+        let foundItem = null;
+        if (slotKey === 'poem') {
+          foundItem = allItemsByCategory.poem.find((x) => x.nightNumber === nightNum);
+        } else if (slotKey === 'story') {
+          foundItem = allItemsByCategory.story.find((x) => x.nightNumber === nightNum);
+        } else if (slotKey === 'essay') {
+          foundItem = allItemsByCategory.essay.find((x) => x.nightNumber === nightNum);
+        } else if (slotKey === 'korea') {
+          foundItem = allItemsByCategory.personal.find(
+            (x) => x.region === 'Korea' && x.nightNumber === nightNum
+          );
+        } else if (slotKey === 'sf') {
+          foundItem = allItemsByCategory.personal.find(
+            (x) => x.region === 'San Francisco' && x.nightNumber === nightNum
+          );
+        }
+        if (foundItem) {
+          setActiveReader({
+            item: foundItem,
+            categoryKey: foundItem.categoryKey,
+            slotLabel: foundItem.slotLabel
+          });
+        }
       }
     };
     parseLocationForReader();
     window.addEventListener('hashchange', parseLocationForReader);
     return () => window.removeEventListener('hashchange', parseLocationForReader);
-  }, []);
+  }, [allItemsByCategory]);
 
-  const currentNight = userState.currentNight || 1;
+  // Compute Streak & Completion Stats across the 4 categories
+  const streakStats = useMemo(() => {
+    const completedEntries = Object.values(userState.completedItems || {}).filter(
+      (x) => x && x.completed
+    );
+    const poemsDone = allItemsByCategory.poem.filter(
+      (i) => userState.completedItems[i.id]?.completed
+    ).length;
+    const storiesDone = allItemsByCategory.story.filter(
+      (i) => userState.completedItems[i.id]?.completed
+    ).length;
+    const essaysDone = allItemsByCategory.essay.filter(
+      (i) => userState.completedItems[i.id]?.completed
+    ).length;
+    const personalDone = allItemsByCategory.personal.filter(
+      (i) => userState.completedItems[i.id]?.completed
+    ).length;
 
-  // Build resolved 10-Night schedule taking any user swaps into account
-  const nightsSchedule = useMemo(() => {
-    const primaryPoems = poemsAndEssays.poems.filter((p) => !p.isSwap);
-    const primaryStories = storiesAndPlaces.stories.filter((s) => !s.isSwap);
-    const primaryEssays = poemsAndEssays.essays.filter((e) => !e.isSwap);
-    const koreaList = storiesAndPlaces.koreaStories;
-    const sfList = storiesAndPlaces.sfStories;
+    const totalCompleted =
+      poemsDone + storiesDone + essaysDone + personalDone + userState.externalLogs.length;
+    const categoriesTouched = [poemsDone > 0, storiesDone > 0, essaysDone > 0, personalDone > 0].filter(
+      Boolean
+    ).length;
 
-    const schedule = {};
-    for (let n = 1; n <= 10; n++) {
-      const swapCfg = userState.swappedItems?.[n] || {};
-      const poem =
-        poemsAndEssays.poems.find((p) => p.id === swapCfg.poem) ||
-        primaryPoems.find((p) => p.night === n) ||
-        primaryPoems[n - 1];
-      const story =
-        storiesAndPlaces.stories.find((s) => s.id === swapCfg.story) ||
-        primaryStories.find((s) => s.night === n) ||
-        primaryStories[n - 1];
-      const essay =
-        poemsAndEssays.essays.find((e) => e.id === swapCfg.essay) ||
-        primaryEssays.find((e) => e.night === n) ||
-        primaryEssays[n - 1];
-      const korea = koreaList.find((k) => k.night === n) || koreaList[n - 1];
-      const sf = sfList.find((s) => s.night === n) || sfList[n - 1];
+    const goldNights = Math.floor(totalCompleted / 3);
+    const freezeTokens = Math.min(2, 1 + Math.floor(goldNights / 7));
+    const litFlameStreak = totalCompleted > 0 ? Math.max(1, totalCompleted) : 1;
 
-      schedule[n] = {
-        night: n,
-        isBossNight: n === 6 || n === 7,
-        metaphorCollision: METAPHOR_COLLISION_NOTES[n],
-        poem,
-        story,
-        essay,
-        korea,
-        sf
-      };
-    }
-    return schedule;
-  }, [userState.swappedItems]);
-
-  const tonightData = nightsSchedule[currentNight];
-  const tonightSlotsState = userState.completedSlots[currentNight] || {};
-  const tonightStatus = evaluateNightStatus(tonightSlotsState);
-  const streakSummary = useMemo(
-    () => recomputeStreakSummary(userState.completedSlots, 1),
-    [userState.completedSlots]
-  );
-
-  function openReaderByNightAndSlot(nightNum, slotKey, updateHash = true) {
-    const bundle = nightsSchedule[nightNum];
-    if (!bundle) return;
-    const labelMap = {
-      poem: 'Nightly Poem',
-      story: 'Nightly Short Story',
-      essay: 'Nightly Essay',
-      korea: 'Korea Deep-Dive Story',
-      sf: 'San Francisco Deep-Dive Story'
+    return {
+      poemsDone,
+      storiesDone,
+      essaysDone,
+      personalDone,
+      totalCompleted,
+      categoriesTouched,
+      goldNights,
+      freezeTokens,
+      maxFreezeTokens: 2,
+      litFlameStreak
     };
-    const item = bundle[slotKey];
-    if (!item) return;
-    setActiveReader({
-      night: nightNum,
-      slotKey,
-      item,
-      slotLabel: labelMap[slotKey] || 'Nightly Reading'
-    });
-    if (updateHash) {
-      window.history.replaceState(null, '', `#/read/day-${nightNum}/${slotKey}`);
+  }, [userState.completedItems, userState.externalLogs, allItemsByCategory]);
+
+  // Compute Subcategories for the currently selected main category
+  const availableSubcategories = useMemo(() => {
+    const items = allItemsByCategory[selectedCategory] || [];
+    if (selectedCategory === 'personal') {
+      const cats = new Set(['All', 'Korea (All 10)', 'San Francisco (All 10)']);
+      items.forEach((item) => {
+        if (item.category) cats.add(item.category);
+      });
+      return Array.from(cats);
     }
+    const genres = new Set(['All']);
+    items.forEach((item) => {
+      if (item.genre) genres.add(item.genre);
+    });
+    return Array.from(genres);
+  }, [allItemsByCategory, selectedCategory]);
+
+  // Filter items by selected subcategory, then split into Unread (top) and Completed (grayed out at bottom)
+  const { unreadItems, completedCategoryItems } = useMemo(() => {
+    const rawItems = allItemsByCategory[selectedCategory] || [];
+    const filtered = rawItems.filter((item) => {
+      if (selectedSubcategory === 'All') return true;
+      if (selectedCategory === 'personal') {
+        if (selectedSubcategory === 'Korea (All 10)') return item.region === 'Korea';
+        if (selectedSubcategory === 'San Francisco (All 10)') return item.region === 'San Francisco';
+        return item.category === selectedSubcategory;
+      }
+      return item.genre === selectedSubcategory;
+    });
+
+    const unread = [];
+    const done = [];
+    filtered.forEach((item) => {
+      if (userState.completedItems[item.id]?.completed) {
+        done.push(item);
+      } else {
+        unread.push(item);
+      }
+    });
+
+    return { unreadItems: unread, completedCategoryItems: done };
+  }, [allItemsByCategory, selectedCategory, selectedSubcategory, userState.completedItems]);
+
+  function openReader(item) {
+    setActiveReader({
+      item,
+      categoryKey: item.categoryKey,
+      slotLabel: item.slotLabel
+    });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function closeReader() {
     setActiveReader(null);
-    window.history.replaceState(null, '', window.location.pathname);
+    if (window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
   }
 
-  function toggleSlotComplete(nightNum, slotKey) {
+  function toggleItemCompleted(item) {
     setUserState((prev) => {
-      const prevNight = prev.completedSlots[nightNum] || {};
-      const nextVal = !prevNight[slotKey];
-      const updatedNight = {
-        ...prevNight,
-        [slotKey]: nextVal,
-        completedAt: nextVal ? new Date().toISOString() : prevNight.completedAt
-      };
-      const updatedCompletedSlots = {
-        ...prev.completedSlots,
-        [nightNum]: updatedNight
-      };
-      const newStatus = evaluateNightStatus(updatedNight);
-      if (nextVal) {
-        if (newStatus.isDiamondNight) {
-          showToastMessage(`Diamond Quartet Complete for Night ${nightNum}! All 4 pillars lit.`);
-        } else if (newStatus.isGoldNight) {
-          showToastMessage(`Gold Bradbury Night unlocked for Night ${nightNum}! (+1 toward Streak Freeze)`);
-        } else if (newStatus.isLitFlame && newStatus.pillarsCompleted === 1) {
-          showToastMessage(`Lit Flame ignited for Night ${nightNum}! Your daily streak is safe.`);
+      const wasDone = Boolean(prev.completedItems[item.id]?.completed);
+      const nextDone = !wasDone;
+      const updated = {
+        ...prev.completedItems,
+        [item.id]: {
+          completed: nextDone,
+          completedAt: nextDone ? new Date().toISOString() : null,
+          categoryKey: item.categoryKey
         }
+      };
+      if (nextDone) {
+        showToastMessage(
+          `Completed "${item.title}"! Moved to Completed at the bottom & credited your streak.`
+        );
+      } else {
+        showToastMessage(`Moved "${item.title}" back to your Unread queue.`);
       }
       return {
         ...prev,
-        completedSlots: updatedCompletedSlots
+        completedItems: updated
       };
     });
   }
 
-  function handleSwapSlot(nightNum, slotKey) {
-    const pool =
-      slotKey === 'poem'
-        ? poemsAndEssays.poems
-        : slotKey === 'story'
-        ? storiesAndPlaces.stories
-        : slotKey === 'essay'
-        ? poemsAndEssays.essays
-        : [];
-    if (!pool.length) return;
-
-    const currentItem = nightsSchedule[nightNum][slotKey];
-    const swapCandidates = pool.filter((item) => item.isSwap || item.id !== currentItem.id);
-    const currentIndex = swapCandidates.findIndex((i) => i.id === currentItem.id);
-    const nextCandidate = swapCandidates[(currentIndex + 1) % swapCandidates.length];
-
-    setUserState((prev) => ({
-      ...prev,
-      swappedItems: {
-        ...prev.swappedItems,
-        [nightNum]: {
-          ...(prev.swappedItems[nightNum] || {}),
-          [slotKey]: nextCandidate.id
-        }
-      }
-    }));
-    showToastMessage(`Swapped tonight's ${slotKey} to "${nextCandidate.title}" by ${nextCandidate.author}`);
-  }
-
-  function handleDownloadSingleEpub(nightNum, slotKey, item, slotLabel) {
+  function handleDownloadSingleEpub(item) {
     const includeAnalysis = userState.profile.includeAnalysisInEpub !== false;
     const blob = buildEpubBlob({
-      title: `${item.title} (Bradbury Night ${nightNum})`,
-      subtitle: `${slotLabel} • ${item.author || item.region}`,
+      title: `${item.title} — ${item.author || item.region}`,
+      subtitle: `${item.slotLabel} • ${item.genre || item.category}`,
       author: item.author || `${item.region} Cultural Chronicle`,
-      uid: `urn:bradbury1000:night-${nightNum}:${slotKey}:${item.id}`,
+      uid: `urn:bradbury1000:item:${item.id}`,
       includeAnalysis,
-      chapters: [{ slotLabel, item }]
+      chapters: [{ slotLabel: item.slotLabel, item }]
     });
-    const safeSlug = item.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    downloadEpubBlob(blob, `bradbury-night-${nightNum}-${slotKey}-${safeSlug}.epub`);
+    const safeSlug = item.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    downloadEpubBlob(blob, `bradbury-${item.id}-${safeSlug}.epub`);
     showToastMessage(`Downloaded "${item.title}.epub" (with 5-paragraph analysis) for ElevenReader!`);
   }
 
-  function handleDownloadNightBundleEpub(nightNum) {
-    const bundle = nightsSchedule[nightNum];
-    const includeAnalysis = userState.profile.includeAnalysisInEpub !== false;
+  function handleDownloadUnreadNightBundle() {
+    const nextPoem =
+      allItemsByCategory.poem.find((i) => !userState.completedItems[i.id]?.completed) ||
+      allItemsByCategory.poem[0];
+    const nextStory =
+      allItemsByCategory.story.find((i) => !userState.completedItems[i.id]?.completed) ||
+      allItemsByCategory.story[0];
+    const nextEssay =
+      allItemsByCategory.essay.find((i) => !userState.completedItems[i.id]?.completed) ||
+      allItemsByCategory.essay[0];
+    const nextPersonal =
+      allItemsByCategory.personal.find((i) => !userState.completedItems[i.id]?.completed) ||
+      allItemsByCategory.personal[0];
+
     const chapters = [
-      { slotLabel: `Night ${nightNum} Poem`, item: bundle.poem },
-      { slotLabel: `Night ${nightNum} Short Story`, item: bundle.story },
-      { slotLabel: `Night ${nightNum} Essay`, item: bundle.essay },
-      { slotLabel: `Night ${nightNum} Korea Lore`, item: bundle.korea },
-      { slotLabel: `Night ${nightNum} San Francisco Lore`, item: bundle.sf }
-    ];
+      { slotLabel: 'Poem', item: nextPoem },
+      { slotLabel: 'Short Story', item: nextStory },
+      { slotLabel: 'Essay', item: nextEssay },
+      { slotLabel: `Personal (${nextPersonal.region})`, item: nextPersonal }
+    ].filter((c) => c.item);
+
     const blob = buildEpubBlob({
-      title: `Bradbury 1000 — Night ${nightNum} Complete Bedtime Bundle`,
-      subtitle: `Poem, Short Story, Essay, Korea & San Francisco Lore + 5-Paragraph Literary Analyses`,
-      author: `${bundle.poem.author}, ${bundle.story.author}, ${bundle.essay.author} & Bradbury 1000`,
-      uid: `urn:bradbury1000:night-${nightNum}:complete-bundle`,
-      includeAnalysis,
+      title: `Bradbury 1000 — Next Unread Quartet (.epub)`,
+      subtitle: `1 Poem, 1 Short Story, 1 Essay & 1 Personal (${nextPersonal?.region}) Story + 5-Paragraph Analyses`,
+      author: 'Bradbury 1000 Curated Anthology',
+      uid: `urn:bradbury1000:next-quartet-${Date.now()}`,
+      includeAnalysis: userState.profile.includeAnalysisInEpub !== false,
       chapters
     });
-    downloadEpubBlob(blob, `bradbury-1000-night-${nightNum}-complete-quartet.epub`);
+    downloadEpubBlob(blob, `bradbury-1000-tonights-unread-quartet.epub`);
     showToastMessage(
-      `Bundled Night ${nightNum} Quartet (.epub) — ready for ElevenReader Chrome Extension or mobile import!`
+      `Bundled your next unread Poem, Short Story, Essay & ${nextPersonal?.region} story into one .epub!`
     );
   }
 
-  function handleDownloadAllPlacesEpub() {
-    const chapters = [];
-    for (let n = 1; n <= 10; n++) {
-      const k = storiesAndPlaces.koreaStories.find((x) => x.night === n);
-      const s = storiesAndPlaces.sfStories.find((x) => x.night === n);
-      if (k) chapters.push({ slotLabel: `Korea Story #${n}`, item: k });
-      if (s) chapters.push({ slotLabel: `San Francisco Story #${n}`, item: s });
-    }
-    const blob = buildEpubBlob({
-      title: `Korea & San Francisco Cultural Lore Anthology (20 Pre-Baked Stories)`,
-      subtitle: `10 Korea Deep-Dives & 10 San Francisco Deep-Dives with 5-Paragraph Cultural Analysis`,
-      author: `Bradbury 1000 Cultural & Historical Anthology`,
-      uid: `urn:bradbury1000:korea-sf-20-anthology`,
-      includeAnalysis: true,
-      chapters
-    });
-    downloadEpubBlob(blob, `bradbury-1000-korea-and-sf-anthology.epub`);
-    showToastMessage(`Downloaded all 20 Korea & San Francisco stories as a single EPUB anthology!`);
-  }
-
-  async function handleElevenReaderShare(nightNum, slotKey, item) {
-    const cleanUrl = `${window.location.origin}/read/day-${nightNum}/${slotKey}`;
+  async function handleElevenReaderShare(item) {
+    const cleanUrl = `${window.location.origin}${item.staticUrl || ''}`;
     const shareData = {
-      title: `${item.title} — Bradbury Night ${nightNum}`,
-      text: `Read or listen to "${item.title}" (${item.author || item.region}) with 5-paragraph analysis on Bradbury 1000.`,
+      title: `${item.title} — Bradbury 1000`,
+      text: `Read or listen to "${item.title}" (${item.author || item.region}) on Bradbury 1000.`,
       url: cleanUrl
     };
 
@@ -312,15 +438,13 @@ export default function App() {
         showToastMessage(`Opened native Share Sheet for ElevenReader handoff!`);
         return;
       } catch {
-        // user canceled or desktop fallback
+        // fallback to clipboard
       }
     }
 
     try {
       await navigator.clipboard.writeText(cleanUrl);
-      showToastMessage(
-        `Copied clean ElevenReader article URL (${cleanUrl}) to clipboard! Paste directly into ElevenReader.`
-      );
+      showToastMessage(`Copied clean ElevenReader article URL (${cleanUrl}) to clipboard!`);
     } catch {
       window.open(cleanUrl, '_blank', 'noopener,noreferrer');
     }
@@ -354,122 +478,85 @@ export default function App() {
     if (!title.trim()) return;
     const entry = {
       id: `ext-${Date.now()}`,
-      night: currentNight,
       slotKey,
       title: title.trim(),
       author: (author || 'External Anthology').trim(),
       loggedAt: new Date().toISOString()
     };
-    setUserState((prev) => {
-      const prevNight = prev.completedSlots[currentNight] || {};
-      return {
-        ...prev,
-        externalLogs: [entry, ...prev.externalLogs],
-        completedSlots: {
-          ...prev.completedSlots,
-          [currentNight]: {
-            ...prevNight,
-            [slotKey]: true,
-            completedAt: new Date().toISOString()
-          }
-        }
-      };
-    });
+    setUserState((prev) => ({
+      ...prev,
+      externalLogs: [entry, ...prev.externalLogs]
+    }));
     setExtCustomTitle('');
     setExtCustomAuthor('');
     setShowExternalModal(false);
-    showToastMessage(`Logged "${title}" toward Night ${currentNight}'s ${slotKey.toUpperCase()} slot!`);
+    showToastMessage(`Logged "${title}" to your permanent library & credited your streak!`);
   }
-
-  const totalReadingMinutesTonight =
-    (tonightData.poem?.readingTimeMinutes || 5) +
-    (tonightData.story?.readingTimeMinutes || 15) +
-    (tonightData.essay?.readingTimeMinutes || 10) +
-    (tonightData.korea?.readingTimeMinutes || 9) +
-    (tonightData.sf?.readingTimeMinutes || 9);
 
   return (
     <div>
-      {/* Top Editorial Masthead */}
+      {/* Top Editorial Masthead with Streak & Profile */}
       <header className="masthead">
         <div className="masthead-inner">
           <div className="brand-group">
             <h1
               className="brand-title"
               id="brand-home-link"
-              onClick={() => {
-                closeReader();
-                setActiveTab('tonight');
-              }}
+              onClick={() => closeReader()}
             >
               Bradbury 1000
             </h1>
             <span className="brand-subtitle">
-              1 Poem • 1 Story • 1 Essay • Korea &amp; SF Lore
+              Poem • Short Story • Essay • Personal (Korea &amp; SF)
             </span>
           </div>
 
-          <nav className="nav-tabs" aria-label="Primary Navigation">
-            <button
-              id="nav-tab-tonight"
-              className={`nav-tab ${activeTab === 'tonight' && !activeReader ? 'active' : ''}`}
-              onClick={() => {
-                closeReader();
-                setActiveTab('tonight');
-              }}
-            >
-              <Flame size={15} />
-              Tonight’s Ritual
-            </button>
-            <button
-              id="nav-tab-places"
-              className={`nav-tab ${activeTab === 'places' && !activeReader ? 'active' : ''}`}
-              onClick={() => {
-                closeReader();
-                setActiveTab('places');
-              }}
-            >
-              <Compass size={15} />
-              Korea &amp; SF Stories (20)
-            </button>
-            <button
-              id="nav-tab-curriculum"
-              className={`nav-tab ${activeTab === 'curriculum' && !activeReader ? 'active' : ''}`}
-              onClick={() => {
-                closeReader();
-                setActiveTab('curriculum');
-              }}
-            >
-              <Library size={15} />
-              10-Night Curriculum
-            </button>
-          </nav>
-
-          {/* 2-Tier Duolingo Streak & Profile Cluster */}
+          {/* Duolingo-Style Streak Bar */}
           <div className="streak-cluster">
             <div
               className="streak-pill flame"
-              title="Tier 1 Lit Flame Streak: Complete at least 1 reading each night to keep your daily flame alive"
+              title="Lit Flame Streak: Complete at least 1 reading to keep your daily flame lit"
             >
               <Flame size={15} />
-              <span>{streakSummary.litFlameDays}d Flame</span>
+              <span>{streakStats.litFlameStreak} Flame Streak</span>
             </div>
             <div
               className="streak-pill gold"
-              title="Tier 2 Gold Bradbury Nights: Complete 3+ pillars in a night to advance your 1,000 Nights counter"
+              title="Gold Bradbury Nights: Every 3 completed readings earns a Gold Night toward 1,000"
             >
               <Award size={15} />
-              <span>{streakSummary.goldNightsCount} / 1000 Gold</span>
+              <span>{streakStats.goldNights} / 1000 Gold Nights</span>
             </div>
             <div
               className="streak-pill freeze"
-              title="Streak Freeze Vault: Earn 1 Freeze every 7 Gold Nights (max 2 held)"
+              title="Streak Freeze Vault (max 2 held, +1 every 7 Gold Nights)"
             >
               <Snowflake size={14} />
               <span>
-                {streakSummary.freezeTokens}/{streakSummary.maxFreezeTokens} Freezes
+                {streakStats.freezeTokens}/{streakStats.maxFreezeTokens} Freezes
               </span>
             </div>
+
+            <button
+              id="bundle-next-quartet-btn"
+              className="btn-secondary"
+              style={{ padding: '0.38rem 0.72rem', fontSize: '0.78rem' }}
+              onClick={handleDownloadUnreadNightBundle}
+              title="Bundle your next unread Poem, Short Story, Essay & Personal Story into one .epub for ElevenReader"
+            >
+              <Download size={14} />
+              Bundle Next Quartet (.epub)
+            </button>
+
+            <button
+              id="log-external-book-btn"
+              className="icon-btn"
+              onClick={() => setShowExternalModal(true)}
+              title="Log an external book or story"
+            >
+              <PlusCircle size={15} />
+              <span>Log Book</span>
+            </button>
 
             <button
               id="theme-toggle-btn"
@@ -502,27 +589,20 @@ export default function App() {
       </header>
 
       <main className="page-shell">
-        {/* IN-APP DISTRACTION-FREE READER VIEW */}
         {activeReader ? (
+          /* DISTRACTION-FREE READER VIEW WITH 5-PARAGRAPH ANALYSIS & REAL SOURCES */
           <div className="reader-container">
             <div className="reader-toolbar">
               <button id="reader-back-btn" className="btn-secondary" onClick={closeReader}>
                 <ArrowLeft size={15} />
-                Back to Night {activeReader.night}
+                Back to {activeReader.slotLabel} Queue
               </button>
 
               <div className="slot-actions">
                 <button
                   id="reader-elevenreader-share-btn"
                   className="btn-secondary"
-                  onClick={() =>
-                    handleElevenReaderShare(
-                      activeReader.night,
-                      activeReader.slotKey,
-                      activeReader.item
-                    )
-                  }
-                  title="2-Tap Mobile Share to ElevenReader or Copy Distraction-Free Article URL"
+                  onClick={() => handleElevenReaderShare(activeReader.item)}
                 >
                   <Headphones size={15} />
                   Listen in ElevenReader
@@ -531,41 +611,33 @@ export default function App() {
                 <button
                   id="reader-download-epub-btn"
                   className="btn-secondary"
-                  onClick={() =>
-                    handleDownloadSingleEpub(
-                      activeReader.night,
-                      activeReader.slotKey,
-                      activeReader.item,
-                      activeReader.slotLabel
-                    )
-                  }
-                  title="Download spec-compliant .epub (with 5-paragraph analysis) for ElevenReader Chrome Extension"
+                  onClick={() => handleDownloadSingleEpub(activeReader.item)}
                 >
                   <Download size={15} />
                   Send .EPUB to ElevenReader
                 </button>
 
-                <a
-                  href={`/read/day-${activeReader.night}/${activeReader.slotKey}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="icon-btn"
-                  title="Open raw static HTML Reader URL for ElevenReader URL Import"
-                >
-                  <ExternalLink size={14} />
-                  Clean URL
-                </a>
+                {activeReader.item.staticUrl && (
+                  <a
+                    href={activeReader.item.staticUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="icon-btn"
+                    title="Open raw static HTML Reader URL for ElevenReader URL Import"
+                  >
+                    <ExternalLink size={14} />
+                    Clean URL
+                  </a>
+                )}
 
                 <button
                   id="reader-mark-complete-btn"
                   className={`check-btn ${
-                    userState.completedSlots[activeReader.night]?.[activeReader.slotKey]
-                      ? 'done'
-                      : ''
+                    userState.completedItems[activeReader.item.id]?.completed ? 'done' : ''
                   }`}
-                  onClick={() => toggleSlotComplete(activeReader.night, activeReader.slotKey)}
+                  onClick={() => toggleItemCompleted(activeReader.item)}
                 >
-                  {userState.completedSlots[activeReader.night]?.[activeReader.slotKey] ? (
+                  {userState.completedItems[activeReader.item.id]?.completed ? (
                     <>
                       <CheckCircle2 size={15} />
                       Completed
@@ -582,8 +654,7 @@ export default function App() {
 
             <article>
               <div className="reader-kicker">
-                Night {activeReader.night} of 1,000 • {activeReader.slotLabel} •{' '}
-                {activeReader.item.genre || activeReader.item.category}
+                {activeReader.slotLabel} • {activeReader.item.genre || activeReader.item.category}
               </div>
               <h1 className="reader-title">{activeReader.item.title}</h1>
               <p className="reader-byline">
@@ -605,7 +676,7 @@ export default function App() {
                 <blockquote className="reader-epigraph">{activeReader.item.epigraph}</blockquote>
               )}
 
-              {/* Full Pre-Baked Text */}
+              {/* Verbatim Full Text */}
               <div className="reader-body">
                 {Array.isArray(activeReader.item.fullText) ? (
                   activeReader.item.fullText.map((stanza, sIdx) => (
@@ -659,7 +730,72 @@ export default function App() {
                   </section>
                 )}
 
-              {/* Bottom Completion & Source Links */}
+              {/* Primary & Historical Sources for Korea & San Francisco Deep-Dives */}
+              {Array.isArray(activeReader.item.sources) &&
+                activeReader.item.sources.length > 0 && (
+                  <section
+                    className="analysis-panel"
+                    id="historical-sources-panel"
+                    style={{ marginTop: '2rem', paddingTop: '1.75rem' }}
+                  >
+                    <div className="analysis-header">
+                      <div>
+                        <div className="reader-kicker">Verified Archival &amp; Scholarly Citations</div>
+                        <h2 className="analysis-title">Primary &amp; Historical Sources</h2>
+                      </div>
+                      <span className="slot-tag">
+                        {activeReader.item.sources.length} Real Sources Cited
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'grid', gap: '0.75rem' }}>
+                      {activeReader.item.sources.map((src, sIdx) => (
+                        <div
+                          key={sIdx}
+                          className="analysis-paragraph-card"
+                          style={{ marginBottom: 0, padding: '0.95rem 1.2rem' }}
+                        >
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'baseline',
+                              gap: '0.75rem',
+                              flexWrap: 'wrap'
+                            }}
+                          >
+                            <strong style={{ fontSize: '0.95rem' }}>{src.title}</strong>
+                            {src.url && (
+                              <a
+                                href={src.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  fontSize: '0.78rem',
+                                  color: 'var(--accent-flame)',
+                                  fontWeight: 600,
+                                  textDecoration: 'none'
+                                }}
+                              >
+                                Source Reference ↗
+                              </a>
+                            )}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: '0.84rem',
+                              color: 'var(--text-secondary)',
+                              marginTop: '0.25rem'
+                            }}
+                          >
+                            {src.author} {src.year ? `• ${src.year}` : ''}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
               <div
                 style={{
                   marginTop: '2.25rem',
@@ -692,516 +828,310 @@ export default function App() {
                       className="btn-secondary"
                     >
                       <ExternalLink size={14} />
-                      Reference Archive
+                      Original Source Archive
                     </a>
                   )}
                 </div>
 
                 <button
-                  className={`btn-primary`}
+                  className="btn-primary"
                   onClick={() => {
-                    if (!userState.completedSlots[activeReader.night]?.[activeReader.slotKey]) {
-                      toggleSlotComplete(activeReader.night, activeReader.slotKey);
+                    if (!userState.completedItems[activeReader.item.id]?.completed) {
+                      toggleItemCompleted(activeReader.item);
                     }
                     closeReader();
                   }}
                 >
                   <Check size={16} />
-                  {userState.completedSlots[activeReader.night]?.[activeReader.slotKey]
-                    ? 'Done — Return to Night Dashboard'
-                    : 'Complete Reading & Credit Streak'}
+                  {userState.completedItems[activeReader.item.id]?.completed
+                    ? 'Completed — Back to Queue'
+                    : 'Mark Read & Credit Streak'}
                 </button>
               </div>
             </article>
           </div>
-        ) : activeTab === 'tonight' ? (
-          /* TONIGHT'S RITUAL DASHBOARD */
+        ) : (
+          /* HOME PAGE: STREAK HERO + 4-PILLAR PICKER + GENRE SUBCATEGORIES + UNREAD vs GRAYED COMPLETED */
           <>
+            {/* Streak & Question Hero */}
             <section className="ritual-hero">
               <div className="ritual-hero-top">
-                <div style={{ flex: '1 1 520px' }}>
+                <div style={{ flex: '1 1 500px' }}>
                   <div className="night-eyebrow">
-                    <span>Night {currentNight} of 1,000 • Pre-Baked Prototype (Nights 1–10)</span>
-                    {tonightData.isBossNight && (
-                      <span className="boss-badge">Weekend Boss Night</span>
-                    )}
+                    <span>Bradbury 1,000 Nights • {streakStats.totalCompleted} Total Readings Completed</span>
                   </div>
-                  <h2 className="ritual-headline">
-                    Tonight’s Metaphor Collision &amp; Bedtime Quartet
-                  </h2>
-                  <p className="ritual-quote">{tonightData.metaphorCollision}</p>
+                  <h2 className="ritual-headline">What would you like to read tonight?</h2>
+                  <p className="ritual-quote">
+                    Choose a pillar below—<strong>Poem</strong>, <strong>Short Story</strong>,{' '}
+                    <strong>Essay</strong>, or <strong>Personal (Korea &amp; San Francisco)</strong>—and
+                    filter by genre. Unread picks appear first; completed readings are grayed out at
+                    the bottom.
+                  </p>
                 </div>
 
-                {/* Duolingo-Style 2-Tier Night Progress Card */}
+                {/* Duolingo Streak Summary Card */}
                 <div className="tier-meter-card">
                   <div className="tier-meter-header">
-                    <span>
-                      {tonightStatus.isDiamondNight
-                        ? '💎 Diamond Quartet Complete (4/4)'
-                        : tonightStatus.isGoldNight
-                        ? '🏆 Gold Bradbury Night Unlocked (3/4)'
-                        : tonightStatus.isLitFlame
-                        ? '🔥 Lit Flame Active (Daily Streak Safe)'
-                        : '🌙 Complete 1 Reading to Light Tonight’s Flame'}
-                    </span>
-                    <span>{tonightStatus.pillarsCompleted}/4 Pillars</span>
+                    <span>🔥 {streakStats.litFlameStreak}d Streak • {streakStats.goldNights} Gold Nights</span>
+                    <span>{streakStats.totalCompleted} Read</span>
                   </div>
                   <div className="tier-steps">
-                    {[1, 2, 3, 4].map((step) => {
-                      const active = tonightStatus.pillarsCompleted >= step;
-                      const cls = !active
-                        ? ''
-                        : tonightStatus.isDiamondNight
-                        ? 'filled-diamond'
-                        : tonightStatus.isGoldNight
-                        ? 'filled-gold'
-                        : 'filled-flame';
-                      return <div key={step} className={`tier-step-bar ${cls}`} />;
-                    })}
+                    {[
+                      { label: 'Poems', count: streakStats.poemsDone },
+                      { label: 'Stories', count: streakStats.storiesDone },
+                      { label: 'Essays', count: streakStats.essaysDone },
+                      { label: 'Personal', count: streakStats.personalDone }
+                    ].map((p, idx) => (
+                      <div
+                        key={idx}
+                        className={`tier-step-bar ${p.count > 0 ? 'filled-gold' : ''}`}
+                        title={`${p.label}: ${p.count} completed`}
+                      />
+                    ))}
                   </div>
                   <div className="tier-caption">
-                    <span>1/4 = Lit Flame</span>
-                    <span>3/4 = Gold Night</span>
-                    <span>4/4 = Diamond Quartet</span>
+                    <span>Poems: {streakStats.poemsDone}</span>
+                    <span>Stories: {streakStats.storiesDone}</span>
+                    <span>Essays: {streakStats.essaysDone}</span>
+                    <span>Korea/SF: {streakStats.personalDone}</span>
                   </div>
                 </div>
               </div>
 
-              {/* 10-Night Selector Strip */}
-              <div className="night-selector-bar" role="tablist" aria-label="Select Night 1 to 10">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => {
-                  const st = evaluateNightStatus(userState.completedSlots[n] || {});
+              {/* 4-Pillar Selector Cards */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: '0.85rem',
+                  marginTop: '1.35rem',
+                  paddingTop: '1.25rem',
+                  borderTop: '1px solid var(--border-subtle)'
+                }}
+                role="tablist"
+                aria-label="Choose reading category"
+              >
+                {MAIN_CATEGORIES.map((cat) => {
+                  const IconComp = cat.icon;
+                  const isActive = selectedCategory === cat.key;
+                  const catItems = allItemsByCategory[cat.key] || [];
+                  const unreadCount = catItems.filter(
+                    (i) => !userState.completedItems[i.id]?.completed
+                  ).length;
+                  const doneCount = catItems.length - unreadCount;
+
                   return (
                     <button
-                      key={n}
-                      id={`select-night-${n}`}
-                      className={`night-chip ${currentNight === n ? 'active' : ''} ${
-                        st.isDiamondNight
-                          ? 'tier-diamond'
-                          : st.isGoldNight
-                          ? 'tier-gold'
-                          : ''
-                      }`}
-                      onClick={() => setUserState((prev) => ({ ...prev, currentNight: n }))}
+                      key={cat.key}
+                      id={`pick-category-${cat.key}`}
+                      onClick={() => handleSelectCategory(cat.key)}
+                      style={{
+                        textAlign: 'left',
+                        padding: '1rem 1.15rem',
+                        borderRadius: 'var(--radius-md)',
+                        border: isActive
+                          ? '2px solid var(--text-primary)'
+                          : '1px solid var(--border-subtle)',
+                        background: isActive ? 'var(--bg-primary)' : 'var(--bg-elevated)',
+                        boxShadow: isActive ? 'var(--shadow-card)' : 'none',
+                        transition: 'all 0.15s ease',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: '0.45rem'
+                      }}
                     >
-                      <span>Night {n}</span>
-                      {(n === 6 || n === 7) && <span title="Weekend Boss Night">★</span>}
-                      {st.isDiamondNight ? (
-                        <span>💎</span>
-                      ) : st.isGoldNight ? (
-                        <span>🏆</span>
-                      ) : st.isLitFlame ? (
-                        <span>🔥</span>
-                      ) : null}
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          width: '100%'
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-display)',
+                            fontSize: '1.45rem',
+                            color: 'var(--text-primary)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                          }}
+                        >
+                          <IconComp size={18} />
+                          {cat.label}
+                        </span>
+                        <span
+                          className="slot-badge"
+                          style={{
+                            background: isActive ? 'var(--text-primary)' : 'var(--bg-subtle)',
+                            color: isActive ? 'var(--bg-elevated)' : 'var(--text-secondary)'
+                          }}
+                        >
+                          {unreadCount} Unread
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.77rem', color: 'var(--text-secondary)' }}>
+                        {cat.subtitle}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '0.72rem',
+                          fontFamily: 'var(--font-mono)',
+                          color: 'var(--text-muted)'
+                        }}
+                      >
+                        {doneCount} completed • {catItems.length} total
+                      </div>
                     </button>
                   );
                 })}
               </div>
-            </section>
 
-            {/* ElevenReader & Nightly EPUB Bundle Action Bar */}
-            <section className="handoff-bar" aria-label="ElevenReader Audio and EPUB Handoff">
-              <div className="handoff-info">
-                <Headphones size={20} style={{ color: 'var(--accent-flame)', flexShrink: 0 }} />
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>
-                    ElevenReader Bedtime Handoff • ~{totalReadingMinutesTonight} min total audio
-                  </div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                    Package all of Night {currentNight}’s pre-baked texts + 5-paragraph analyses
-                    into one spec-compliant <code>.epub</code>, or share individual distraction-free
-                    reader URLs.
-                  </div>
-                </div>
-              </div>
-
-              <div className="handoff-actions">
-                <button
-                  id="bundle-tonight-epub-btn"
-                  className="btn-primary"
-                  onClick={() => handleDownloadNightBundleEpub(currentNight)}
+              {/* Subcategory / Genre Filter Pills */}
+              <div
+                className="night-selector-bar"
+                style={{ marginTop: '1rem', paddingTop: '1rem' }}
+                role="tablist"
+                aria-label="Filter by Genre or Subcategory"
+              >
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '0.73rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.07em',
+                    color: 'var(--text-muted)',
+                    marginRight: '0.35rem',
+                    whiteSpace: 'nowrap'
+                  }}
                 >
-                  <Download size={15} />
-                  Bundle Tonight’s Quartet (.epub)
-                </button>
-                <button
-                  id="log-external-book-btn"
-                  className="btn-secondary"
-                  onClick={() => setShowExternalModal(true)}
-                >
-                  <PlusCircle size={15} />
-                  Log External Book / Kindle
-                </button>
+                  Genre / Subcategory:
+                </span>
+                {availableSubcategories.map((sub) => (
+                  <button
+                    key={sub}
+                    className={`night-chip ${selectedSubcategory === sub ? 'active' : ''}`}
+                    onClick={() => setSelectedSubcategory(sub)}
+                  >
+                    {sub}
+                  </button>
+                ))}
               </div>
             </section>
 
-            {/* THE 4 NIGHTLY PILLARS: POEM, SHORT STORY, ESSAY + KOREA & SF LORE */}
-            <div className="quartet-grid">
-              {/* SLOT 1: POEM + 5-PARAGRAPH ANALYSIS */}
-              <SlotCard
-                night={currentNight}
-                slotKey="poem"
-                slotNumber="Pillar I • Poem"
-                item={tonightData.poem}
-                completed={Boolean(tonightSlotsState.poem)}
-                onOpenReader={() => openReaderByNightAndSlot(currentNight, 'poem')}
-                onToggleComplete={() => toggleSlotComplete(currentNight, 'poem')}
-                onSwap={() => handleSwapSlot(currentNight, 'poem')}
-                onDownloadEpub={() =>
-                  handleDownloadSingleEpub(
-                    currentNight,
-                    'poem',
-                    tonightData.poem,
-                    `Night ${currentNight} Poem`
-                  )
-                }
-                onShareElevenReader={() =>
-                  handleElevenReaderShare(currentNight, 'poem', tonightData.poem)
-                }
-              />
-
-              {/* SLOT 2: SHORT STORY + 5-PARAGRAPH ANALYSIS */}
-              <SlotCard
-                night={currentNight}
-                slotKey="story"
-                slotNumber="Pillar II • Short Story"
-                item={tonightData.story}
-                completed={Boolean(tonightSlotsState.story)}
-                onOpenReader={() => openReaderByNightAndSlot(currentNight, 'story')}
-                onToggleComplete={() => toggleSlotComplete(currentNight, 'story')}
-                onSwap={() => handleSwapSlot(currentNight, 'story')}
-                onDownloadEpub={() =>
-                  handleDownloadSingleEpub(
-                    currentNight,
-                    'story',
-                    tonightData.story,
-                    `Night ${currentNight} Short Story`
-                  )
-                }
-                onShareElevenReader={() =>
-                  handleElevenReaderShare(currentNight, 'story', tonightData.story)
-                }
-              />
-
-              {/* SLOT 3: ESSAY + 5-PARAGRAPH COMMENTARY */}
-              <SlotCard
-                night={currentNight}
-                slotKey="essay"
-                slotNumber="Pillar III • Essay"
-                item={tonightData.essay}
-                completed={Boolean(tonightSlotsState.essay)}
-                onOpenReader={() => openReaderByNightAndSlot(currentNight, 'essay')}
-                onToggleComplete={() => toggleSlotComplete(currentNight, 'essay')}
-                onSwap={() => handleSwapSlot(currentNight, 'essay')}
-                onDownloadEpub={() =>
-                  handleDownloadSingleEpub(
-                    currentNight,
-                    'essay',
-                    tonightData.essay,
-                    `Night ${currentNight} Essay`
-                  )
-                }
-                onShareElevenReader={() =>
-                  handleElevenReaderShare(currentNight, 'essay', tonightData.essay)
-                }
-              />
-            </div>
-
-            {/* PILLAR IV: KOREA & SAN FRANCISCO EQUAL LORE SECTION */}
-            <section style={{ marginTop: '0.5rem' }}>
+            {/* UNREAD OPTIONS SECTION */}
+            <section style={{ marginBottom: '2.5rem' }}>
               <div
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'baseline',
+                  marginBottom: '1rem',
                   flexWrap: 'wrap',
-                  gap: '0.75rem',
-                  marginBottom: '1rem'
+                  gap: '0.5rem'
                 }}
               >
-                <div>
-                  <div className="night-eyebrow">
-                    Pillar IV • Place, History &amp; Cultural Lore (500 Korea + 500 San Francisco Track)
-                  </div>
+                <h3
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: '1.65rem',
+                    fontWeight: 400,
+                    margin: 0
+                  }}
+                >
+                  Unread {MAIN_CATEGORIES.find((c) => c.key === selectedCategory)?.label} Options (
+                  {unreadItems.length})
+                </h3>
+                {selectedSubcategory !== 'All' && (
+                  <button
+                    className="icon-btn"
+                    onClick={() => setSelectedSubcategory('All')}
+                  >
+                    Showing "{selectedSubcategory}" • Reset to All
+                  </button>
+                )}
+              </div>
+
+              {unreadItems.length === 0 ? (
+                <div
+                  className="ritual-hero"
+                  style={{ textAlign: 'center', padding: '2.25rem' }}
+                >
+                  <p style={{ margin: 0, fontSize: '1rem', color: 'var(--text-secondary)' }}>
+                    You’ve completed every reading in this genre filter! Switch to{' '}
+                    <strong>All</strong> or pick another category above.
+                  </p>
+                </div>
+              ) : (
+                <div className="quartet-grid">
+                  {unreadItems.map((item) => (
+                    <ReadingOptionCard
+                      key={item.id}
+                      item={item}
+                      completed={false}
+                      onOpenReader={() => openReader(item)}
+                      onToggleComplete={() => toggleItemCompleted(item)}
+                      onDownloadEpub={() => handleDownloadSingleEpub(item)}
+                      onShareElevenReader={() => handleElevenReaderShare(item)}
+                      onSelectGenre={(g) => setSelectedSubcategory(g)}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* COMPLETED (GRAYED OUT AT THE BOTTOM) SECTION */}
+            {completedCategoryItems.length > 0 && (
+              <section
+                style={{
+                  marginTop: '2.5rem',
+                  paddingTop: '1.75rem',
+                  borderTop: '1px dashed var(--border-strong)'
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'baseline',
+                    marginBottom: '1rem'
+                  }}
+                >
                   <h3
                     style={{
                       fontFamily: 'var(--font-display)',
-                      fontSize: '1.75rem',
+                      fontSize: '1.45rem',
                       fontWeight: 400,
-                      margin: 0
+                      margin: 0,
+                      color: 'var(--text-muted)'
                     }}
                   >
-                    Tonight’s Korea &amp; San Francisco Deep-Dive Stories
+                    Completed ({completedCategoryItems.length})
                   </h3>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    Already read — click any card to re-read or uncheck
+                  </span>
                 </div>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  Complete either (or both!) to light Pillar IV for Night {currentNight}
-                </span>
-              </div>
 
-              <div className="quartet-grid">
-                <PlaceSlotCard
-                  night={currentNight}
-                  slotKey="korea"
-                  badgeText="Korea Deep-Dive"
-                  badgeClass="korea"
-                  item={tonightData.korea}
-                  completed={Boolean(tonightSlotsState.korea)}
-                  onOpenReader={() => openReaderByNightAndSlot(currentNight, 'korea')}
-                  onToggleComplete={() => toggleSlotComplete(currentNight, 'korea')}
-                  onDownloadEpub={() =>
-                    handleDownloadSingleEpub(
-                      currentNight,
-                      'korea',
-                      tonightData.korea,
-                      `Night ${currentNight} Korea Story`
-                    )
-                  }
-                  onShareElevenReader={() =>
-                    handleElevenReaderShare(currentNight, 'korea', tonightData.korea)
-                  }
-                />
-
-                <PlaceSlotCard
-                  night={currentNight}
-                  slotKey="sf"
-                  badgeText="San Francisco Deep-Dive"
-                  badgeClass="sf"
-                  item={tonightData.sf}
-                  completed={Boolean(tonightSlotsState.sf)}
-                  onOpenReader={() => openReaderByNightAndSlot(currentNight, 'sf')}
-                  onToggleComplete={() => toggleSlotComplete(currentNight, 'sf')}
-                  onDownloadEpub={() =>
-                    handleDownloadSingleEpub(
-                      currentNight,
-                      'sf',
-                      tonightData.sf,
-                      `Night ${currentNight} San Francisco Story`
-                    )
-                  }
-                  onShareElevenReader={() =>
-                    handleElevenReaderShare(currentNight, 'sf', tonightData.sf)
-                  }
-                />
-              </div>
-            </section>
+                <div className="quartet-grid">
+                  {completedCategoryItems.map((item) => (
+                    <ReadingOptionCard
+                      key={item.id}
+                      item={item}
+                      completed={true}
+                      onOpenReader={() => openReader(item)}
+                      onToggleComplete={() => toggleItemCompleted(item)}
+                      onDownloadEpub={() => handleDownloadSingleEpub(item)}
+                      onShareElevenReader={() => handleElevenReaderShare(item)}
+                      onSelectGenre={(g) => setSelectedSubcategory(g)}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
           </>
-        ) : activeTab === 'places' ? (
-          /* KOREA & SAN FRANCISCO 20 PRE-BAKED STORIES ATLAS */
-          <section>
-            <div className="ritual-hero">
-              <div className="ritual-hero-top">
-                <div>
-                  <div className="night-eyebrow">
-                    Equal Cultural Curriculum • 10 Korea + 10 San Francisco Pre-Baked Prototype
-                  </div>
-                  <h2 className="ritual-headline">
-                    Korea &amp; San Francisco Cultural Chronicle
-                  </h2>
-                  <p className="ritual-quote">
-                    Every story is pre-baked with an 8–10 paragraph narrative deep-dive and a
-                    5-paragraph historical &amp; cultural analysis. Review these initial 20 stories
-                    (10 Korea, 10 San Francisco) before scaling to the full 1,000.
-                  </p>
-                </div>
-
-                <div className="handoff-actions">
-                  <button className="btn-primary" onClick={handleDownloadAllPlacesEpub}>
-                    <Download size={15} />
-                    Export All 20 Korea &amp; SF Stories (.epub)
-                  </button>
-                </div>
-              </div>
-
-              <div className="night-selector-bar">
-                {['all', 'Korea', 'San Francisco'].map((flt) => (
-                  <button
-                    key={flt}
-                    className={`night-chip ${placeFilter === flt ? 'active' : ''}`}
-                    onClick={() => setPlaceFilter(flt)}
-                  >
-                    {flt === 'all'
-                      ? 'All 20 Stories (10 Korea + 10 SF)'
-                      : flt === 'Korea'
-                      ? '🇰🇷 Korea (10 Pre-Baked)'
-                      : '🌉 San Francisco (10 Pre-Baked)'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="quartet-grid">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => {
-                const kItem = storiesAndPlaces.koreaStories.find((x) => x.night === n);
-                const sfItem = storiesAndPlaces.sfStories.find((x) => x.night === n);
-                return (
-                  <React.Fragment key={n}>
-                    {(placeFilter === 'all' || placeFilter === 'Korea') && kItem && (
-                      <PlaceSlotCard
-                        night={n}
-                        slotKey="korea"
-                        badgeText={`Night ${n} • Korea`}
-                        badgeClass="korea"
-                        item={kItem}
-                        completed={Boolean(userState.completedSlots[n]?.korea)}
-                        onOpenReader={() => openReaderByNightAndSlot(n, 'korea')}
-                        onToggleComplete={() => toggleSlotComplete(n, 'korea')}
-                        onDownloadEpub={() =>
-                          handleDownloadSingleEpub(n, 'korea', kItem, `Night ${n} Korea Story`)
-                        }
-                        onShareElevenReader={() => handleElevenReaderShare(n, 'korea', kItem)}
-                      />
-                    )}
-                    {(placeFilter === 'all' || placeFilter === 'San Francisco') && sfItem && (
-                      <PlaceSlotCard
-                        night={n}
-                        slotKey="sf"
-                        badgeText={`Night ${n} • San Francisco`}
-                        badgeClass="sf"
-                        item={sfItem}
-                        completed={Boolean(userState.completedSlots[n]?.sf)}
-                        onOpenReader={() => openReaderByNightAndSlot(n, 'sf')}
-                        onToggleComplete={() => toggleSlotComplete(n, 'sf')}
-                        onDownloadEpub={() =>
-                          handleDownloadSingleEpub(
-                            n,
-                            'sf',
-                            sfItem,
-                            `Night ${n} San Francisco Story`
-                          )
-                        }
-                        onShareElevenReader={() => handleElevenReaderShare(n, 'sf', sfItem)}
-                      />
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </div>
-          </section>
-        ) : (
-          /* 10-NIGHT MASTER CURRICULUM & METAPHOR COLLISION MATRIX */
-          <section>
-            <div className="ritual-hero">
-              <div className="night-eyebrow">
-                Bradbury Metaphor Collision Scheduler • 50 Pre-Baked Readings + Analyses
-              </div>
-              <h2 className="ritual-headline">
-                The 10-Night Prototype Index (10 Poems, 10 Stories, 10 Essays, 10 Korea, 10 SF)
-              </h2>
-              <p className="ritual-quote">
-                Click any title below to open its full pre-baked text and 5-paragraph literary
-                analysis, or export any night’s complete bedtime EPUB bundle.
-              </p>
-            </div>
-
-            <div className="curriculum-table-wrap">
-              <table className="curriculum-table">
-                <thead>
-                  <tr>
-                    <th>Night</th>
-                    <th>Poem (+ 5-Para Analysis)</th>
-                    <th>Short Story (+ 5-Para Analysis)</th>
-                    <th>Essay (+ 5-Para Commentary)</th>
-                    <th>Korea Story (10)</th>
-                    <th>San Francisco Story (10)</th>
-                    <th>EPUB Bundle</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => {
-                    const row = nightsSchedule[n];
-                    const st = evaluateNightStatus(userState.completedSlots[n] || {});
-                    return (
-                      <tr key={n}>
-                        <td>
-                          <div style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
-                            Night {n}
-                          </div>
-                          {row.isBossNight && (
-                            <span className="boss-badge" style={{ display: 'inline-block', marginTop: 4 }}>
-                              Boss Night
-                            </span>
-                          )}
-                          <div style={{ marginTop: 4, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                            {st.pillarsCompleted}/4 Pillars
-                          </div>
-                        </td>
-                        <td>
-                          <button
-                            className="nav-tab"
-                            style={{ padding: 0, textAlign: 'left', fontWeight: 600 }}
-                            onClick={() => openReaderByNightAndSlot(n, 'poem')}
-                          >
-                            {row.poem.title}
-                          </button>
-                          <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
-                            {row.poem.author} ({row.poem.year})
-                          </div>
-                        </td>
-                        <td>
-                          <button
-                            className="nav-tab"
-                            style={{ padding: 0, textAlign: 'left', fontWeight: 600 }}
-                            onClick={() => openReaderByNightAndSlot(n, 'story')}
-                          >
-                            {row.story.title}
-                          </button>
-                          <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
-                            {row.story.author} ({row.story.year})
-                          </div>
-                        </td>
-                        <td>
-                          <button
-                            className="nav-tab"
-                            style={{ padding: 0, textAlign: 'left', fontWeight: 600 }}
-                            onClick={() => openReaderByNightAndSlot(n, 'essay')}
-                          >
-                            {row.essay.title}
-                          </button>
-                          <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
-                            {row.essay.author} ({row.essay.year})
-                          </div>
-                        </td>
-                        <td>
-                          <button
-                            className="nav-tab"
-                            style={{ padding: 0, textAlign: 'left', fontWeight: 600 }}
-                            onClick={() => openReaderByNightAndSlot(n, 'korea')}
-                          >
-                            {row.korea.title}
-                          </button>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                            {row.korea.era}
-                          </div>
-                        </td>
-                        <td>
-                          <button
-                            className="nav-tab"
-                            style={{ padding: 0, textAlign: 'left', fontWeight: 600 }}
-                            onClick={() => openReaderByNightAndSlot(n, 'sf')}
-                          >
-                            {row.sf.title}
-                          </button>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                            {row.sf.era}
-                          </div>
-                        </td>
-                        <td>
-                          <button
-                            className="icon-btn"
-                            onClick={() => handleDownloadNightBundleEpub(n)}
-                          >
-                            <Download size={13} />
-                            .epub
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </section>
         )}
       </main>
 
@@ -1214,21 +1144,20 @@ export default function App() {
             </h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
               Read a short story or essay from a physical anthology or Kindle tonight? Search Open
-              Library or enter it directly to credit Night {currentNight}’s streak.
+              Library or enter it directly to credit your streak.
             </p>
 
             <div className="form-field">
-              <label>Which Tonight’s Slot Does This Credit?</label>
+              <label>Category</label>
               <select
                 className="form-input"
                 value={extCustomSlot}
                 onChange={(e) => setExtCustomSlot(e.target.value)}
               >
-                <option value="story">Pillar II — Short Story</option>
-                <option value="poem">Pillar I — Poem</option>
-                <option value="essay">Pillar III — Essay</option>
-                <option value="korea">Pillar IV — Korea Story</option>
-                <option value="sf">Pillar IV — San Francisco Story</option>
+                <option value="story">Short Story</option>
+                <option value="poem">Poem</option>
+                <option value="essay">Essay</option>
+                <option value="personal">Personal (Korea / San Francisco)</option>
               </select>
             </div>
 
@@ -1324,7 +1253,7 @@ export default function App() {
         </div>
       )}
 
-      {/* PROFILE & ELEVENREADER SETTINGS MODAL (watersnathan1@gmail.com) */}
+      {/* PROFILE & ELEVENREADER SETTINGS MODAL */}
       {showProfileModal && (
         <div className="modal-backdrop" onClick={() => setShowProfileModal(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
@@ -1397,26 +1326,6 @@ export default function App() {
               </label>
             </div>
 
-            {userState.externalLogs.length > 0 && (
-              <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>
-                  Logged External Readings ({userState.externalLogs.length})
-                </label>
-                {userState.externalLogs.map((log) => (
-                  <div
-                    key={log.id}
-                    style={{
-                      fontSize: '0.8rem',
-                      padding: '0.35rem 0',
-                      borderBottom: '1px solid var(--border-subtle)'
-                    }}
-                  >
-                    Night {log.night} ({log.slotKey}): <strong>{log.title}</strong> — {log.author}
-                  </div>
-                ))}
-              </div>
-            )}
-
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '1.25rem' }}>
               <button className="btn-primary" onClick={() => setShowProfileModal(false)}>
                 Save &amp; Close
@@ -1436,24 +1345,44 @@ export default function App() {
   );
 }
 
-function SlotCard({
-  night,
-  slotKey,
-  slotNumber,
+function ReadingOptionCard({
   item,
   completed,
   onOpenReader,
   onToggleComplete,
-  onSwap,
   onDownloadEpub,
-  onShareElevenReader
+  onShareElevenReader,
+  onSelectGenre
 }) {
   if (!item) return null;
+
+  const isKorea = item.region === 'Korea';
+  const isSF = item.region === 'San Francisco';
+  const genreOrCategory = item.genre || item.category;
+
   return (
-    <article className={`slot-card ${completed ? 'completed' : ''}`}>
+    <article
+      className={`slot-card ${completed ? 'completed-grayed' : ''}`}
+      style={
+        completed
+          ? {
+              opacity: 0.55,
+              filter: 'grayscale(0.75)',
+              background: 'var(--bg-subtle)'
+            }
+          : undefined
+      }
+    >
       <div>
         <div className="slot-header">
-          <span className="slot-badge">{slotNumber}</span>
+          <span
+            className={`slot-badge ${isKorea ? 'korea' : isSF ? 'sf' : ''}`}
+            style={{ cursor: 'pointer' }}
+            onClick={() => onSelectGenre && onSelectGenre(genreOrCategory)}
+            title="Click to filter by this genre"
+          >
+            {isKorea ? `🇰🇷 Korea • ${item.category}` : isSF ? `🌉 SF • ${item.category}` : genreOrCategory}
+          </span>
           <div className="slot-meta-row">
             <Clock size={13} />
             <span>{item.readingTimeMinutes} min</span>
@@ -1462,150 +1391,54 @@ function SlotCard({
           </div>
         </div>
 
-        <h3 className="slot-title" onClick={onOpenReader}>
+        <h3
+          className="slot-title"
+          onClick={onOpenReader}
+          style={completed ? { textDecoration: 'line-through' } : undefined}
+        >
           {item.title}
         </h3>
         <p className="slot-author">
-          {item.author} • {item.year} ({item.era})
-        </p>
-
-        {item.epigraph && <p className="slot-epigraph">{item.epigraph}</p>}
-
-        <div className="slot-tags">
-          <span className="slot-tag">{item.genre}</span>
-          <span className="slot-tag">
-            + {item.analysis?.length || 5}-Paragraph Literary Analysis
-          </span>
-          {item.standardEbooksUrl && (
-            <a
-              href={item.standardEbooksUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="slot-tag"
-              style={{ textDecoration: 'none', color: 'var(--accent-gold)' }}
-            >
-              Standard Ebooks ↗
-            </a>
-          )}
-        </div>
-      </div>
-
-      <div className="slot-footer">
-        <div className="slot-actions">
-          <button
-            id={`read-${slotKey}-night-${night}`}
-            className="btn-primary"
-            onClick={onOpenReader}
-          >
-            <BookOpen size={14} />
-            Read + Analysis
-          </button>
-
-          <button
-            className="icon-btn"
-            onClick={onShareElevenReader}
-            title="Share Clean Reader URL to ElevenReader (iOS/Android/Web)"
-          >
-            <Share2 size={14} />
-            ElevenReader
-          </button>
-
-          <button
-            className="icon-btn"
-            onClick={onDownloadEpub}
-            title="Download .epub with 5-paragraph analysis for ElevenReader Chrome Extension"
-          >
-            <Download size={14} />
-            .epub
-          </button>
-
-          <button
-            className="icon-btn"
-            onClick={onSwap}
-            title="Swap Tonight's Pick (Different Genre / Pre-Baked Pool)"
-          >
-            <RefreshCw size={13} />
-            Swap
-          </button>
-        </div>
-
-        <button
-          id={`complete-${slotKey}-night-${night}`}
-          className={`check-btn ${completed ? 'done' : ''}`}
-          onClick={onToggleComplete}
-        >
-          {completed ? (
+          {item.author ? (
             <>
-              <CheckCircle2 size={15} />
-              Done
+              {item.author} • {item.year} ({item.era})
             </>
           ) : (
             <>
-              <Circle size={15} />
-              Done
+              {item.subtitle} • {item.era}
             </>
           )}
-        </button>
-      </div>
-    </article>
-  );
-}
-
-function PlaceSlotCard({
-  night,
-  slotKey,
-  badgeText,
-  badgeClass,
-  item,
-  completed,
-  onOpenReader,
-  onToggleComplete,
-  onDownloadEpub,
-  onShareElevenReader
-}) {
-  if (!item) return null;
-  return (
-    <article className={`slot-card ${completed ? 'completed' : ''}`}>
-      <div>
-        <div className="slot-header">
-          <span className={`slot-badge ${badgeClass}`}>{badgeText}</span>
-          <div className="slot-meta-row">
-            <Clock size={13} />
-            <span>{item.readingTimeMinutes} min</span>
-            {item.wordCount ? <span>• {item.wordCount.toLocaleString()} words</span> : null}
-          </div>
-        </div>
-
-        <h3 className="slot-title" onClick={onOpenReader}>
-          {item.title}
-        </h3>
-        <p className="slot-author">
-          {item.subtitle} • {item.era}
         </p>
 
         {item.epigraph && <p className="slot-epigraph">{item.epigraph}</p>}
 
         <div className="slot-tags">
-          <span className="slot-tag">{item.category}</span>
-          {item.location && (
-            <span className="slot-tag" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              <MapPin size={11} />
-              {item.location}
+          {item.author ? (
+            <span className="slot-tag">Verbatim Unabridged Text</span>
+          ) : (
+            item.location && (
+              <span className="slot-tag" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <MapPin size={11} />
+                {item.location}
+              </span>
+            )
+          )}
+          <span className="slot-tag">
+            + {item.analysis?.length || 5}-Paragraph Analysis
+          </span>
+          {Array.isArray(item.sources) && item.sources.length > 0 && (
+            <span className="slot-tag" style={{ color: 'var(--accent-gold)' }}>
+              {item.sources.length} Real Sources Cited
             </span>
           )}
-          <span className="slot-tag">+ 5-Paragraph Cultural Analysis</span>
         </div>
       </div>
 
       <div className="slot-footer">
         <div className="slot-actions">
-          <button
-            id={`read-${slotKey}-night-${night}`}
-            className="btn-primary"
-            onClick={onOpenReader}
-          >
+          <button className="btn-primary" onClick={onOpenReader}>
             <BookOpen size={14} />
-            Read Story + Analysis
+            {completed ? 'Re-Read' : 'Read + Analysis'}
           </button>
 
           <button
@@ -1620,7 +1453,7 @@ function PlaceSlotCard({
           <button
             className="icon-btn"
             onClick={onDownloadEpub}
-            title="Download .epub for ElevenReader"
+            title="Download .epub with 5-paragraph analysis for ElevenReader"
           >
             <Download size={14} />
             .epub
@@ -1628,7 +1461,6 @@ function PlaceSlotCard({
         </div>
 
         <button
-          id={`complete-${slotKey}-night-${night}`}
           className={`check-btn ${completed ? 'done' : ''}`}
           onClick={onToggleComplete}
         >
@@ -1640,7 +1472,7 @@ function PlaceSlotCard({
           ) : (
             <>
               <Circle size={15} />
-              Done
+              Mark Done
             </>
           )}
         </button>
