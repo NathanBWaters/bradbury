@@ -182,7 +182,7 @@ async function runRoundTests(round = 'round1') {
       return { heading, chipsCount: chips.length, firstThreeChips: chips.slice(0, 3) };
     })()`);
     console.log('Personal Category Switch Check:', JSON.stringify(personalCheck));
-    assert.ok(personalCheck.heading.includes('20'), 'Personal category should show 20 unread items (10 Korea + 10 SF)');
+    assert.ok(personalCheck.heading.includes('100'), 'Personal category should show 100 unread items (50 Korea + 50 SF)');
 
     if (round !== 'round1') {
       const outPersonal = `/tmp/${round}_mobile_personal.png`;
@@ -209,7 +209,7 @@ async function runRoundTests(round = 'round1') {
     console.log('Completion Partition Check:', JSON.stringify(completionState));
     assert.equal(completionState.hasCompletedSection, true, 'Completed section must appear at bottom');
     assert.equal(completionState.grayedCards, 1, '1 card must be in grayed-out completed section');
-    assert.equal(completionState.unreadCards, 13, '13 unread stories should remain at top');
+    assert.equal(completionState.unreadCards, 99, '99 unread stories should remain at top');
 
     // 3b. Click 'ElevenReader' on the next unread card -> verify it also auto-marks as Completed!
     await cdp.eval(`document.querySelector('#unread-options-grid .slot-card .card-eleven-btn').click()`);
@@ -226,8 +226,8 @@ async function runRoundTests(round = 'round1') {
     );
     assert.equal(
       elevenCompletionState.unreadCards,
-      12,
-      '12 unread stories should remain at top after ElevenReader auto-complete'
+      98,
+      '98 unread stories should remain at top after ElevenReader auto-complete'
     );
 
     // 4. Open Reader View on first unread story
@@ -235,11 +235,13 @@ async function runRoundTests(round = 'round1') {
     await sleep(600);
     const readerCheck = await cdp.eval(`(() => {
       const title = document.querySelector('.reader-title')?.textContent || '';
+      const hasKeyContext = Boolean(document.getElementById('key-context-card'));
       const analysisCards = document.querySelectorAll('#five-paragraph-analysis .analysis-paragraph-card').length;
-      return { title, analysisCards };
+      return { title, hasKeyContext, analysisCards };
     })()`);
     console.log('Reader View Check:', JSON.stringify(readerCheck));
     assert.ok(readerCheck.title.length > 0, 'Reader view title must be rendered');
+    assert.equal(readerCheck.hasKeyContext, true, 'Reader view must render Key Context briefing card');
     assert.equal(readerCheck.analysisCards, 5, 'Reader view must render all 5 analysis paragraphs');
 
     const outReader = `/tmp/${round}_mobile_reader.png`;

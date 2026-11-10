@@ -36,17 +36,17 @@ const storiesAndPlaces = JSON.parse(
 describe('Bradbury 1000 — Catalog Engine & Subcategory Partitioning', () => {
   const catalog = buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces);
 
-  it('normalizes all 62 literary & personal works across the 4 pillars', () => {
-    assert.equal(catalog.poem.length, 14, 'Should have 14 poems (10 primary + 4 swap)');
-    assert.equal(catalog.story.length, 14, 'Should have 14 short stories (10 primary + 4 swap)');
-    assert.equal(catalog.essay.length, 14, 'Should have 14 essays (10 primary + 4 swap)');
-    assert.equal(catalog.personal.length, 20, 'Should have 20 personal essays (10 Korea + 10 SF)');
+  it('normalizes all 400 literary & personal works across the 4 pillars (100 each)', () => {
+    assert.equal(catalog.poem.length, 100, 'Should have 100 poems');
+    assert.equal(catalog.story.length, 100, 'Should have 100 short stories');
+    assert.equal(catalog.essay.length, 100, 'Should have 100 essays');
+    assert.equal(catalog.personal.length, 100, 'Should have 100 personal essays (50 Korea + 50 SF)');
     const total =
       catalog.poem.length +
       catalog.story.length +
       catalog.essay.length +
       catalog.personal.length;
-    assert.equal(total, 62, 'Total catalog should contain 62 works');
+    assert.equal(total, 400, 'Total catalog should contain 400 works');
   });
 
   it('extracts genre subcategories with All first and item counts for each category', () => {
@@ -70,7 +70,7 @@ describe('Bradbury 1000 — Catalog Engine & Subcategory Partitioning', () => {
     };
     const partitioned = filterAndPartitionItems(catalog, 'story', 'All', completedMap);
 
-    assert.equal(partitioned.unreadItems.length, 12);
+    assert.equal(partitioned.unreadItems.length, 98);
     assert.equal(partitioned.completedCategoryItems.length, 2);
     assert.deepEqual(
       partitioned.completedCategoryItems.map((i) => i.id),
@@ -163,7 +163,7 @@ describe('Bradbury 1000 — ElevenReader Plain-Text Share Formatter', () => {
     );
     assert.equal(partitioned.completedCategoryItems.length, 1);
     assert.equal(partitioned.completedCategoryItems[0].id, targetItem.id);
-    assert.equal(partitioned.unreadItems.length, 19);
+    assert.equal(partitioned.unreadItems.length, 99);
   });
 });
 
@@ -201,6 +201,7 @@ describe('Bradbury 1000 — Spec-Compliant Pure-JS EPUB 2/3 Generator', () => {
     assert.ok(asciiText.includes('OEBPS/content.opf'));
     assert.ok(asciiText.includes('OEBPS/toc.ncx'));
     assert.ok(asciiText.includes('OEBPS/chapter_1.xhtml'));
+    assert.ok(asciiText.includes('Key Context &amp; Why It Matters'));
     assert.ok(asciiText.includes('Five-Paragraph Literary &amp; Cultural Analysis'));
   });
 });
@@ -230,7 +231,7 @@ describe('Bradbury 1000 — 2-Tier Duolingo Streak Engine', () => {
   });
 });
 
-describe('Bradbury 1000 — Dataset Verbatim & 5-Paragraph Analysis Integrity', () => {
+describe('Bradbury 1000 — Dataset Verbatim, Key Context & 5-Paragraph Analysis Integrity (400 Works)', () => {
   const catalog = buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces);
   const allWorks = [
     ...catalog.poem,
@@ -239,7 +240,8 @@ describe('Bradbury 1000 — Dataset Verbatim & 5-Paragraph Analysis Integrity', 
     ...catalog.personal
   ];
 
-  it('verifies all 62 works have complete text and a 5-paragraph analysis', () => {
+  it('verifies all 400 works have complete text, Key Context briefing, and a 5-paragraph analysis', () => {
+    assert.equal(allWorks.length, 400);
     for (const item of allWorks) {
       assert.ok(item.title && item.title.length > 1, `Missing title on ${item.id}`);
       assert.ok(
@@ -247,12 +249,20 @@ describe('Bradbury 1000 — Dataset Verbatim & 5-Paragraph Analysis Integrity', 
         `Missing author/region on ${item.id}`
       );
       assert.ok(item.subcategory && item.subcategory.length > 1, `Missing subcategory on ${item.id}`);
+      assert.ok(
+        item.keyContext && item.keyContext.length >= 180,
+        `Work ${item.id} (${item.title}) must have a rich keyContext briefing (>=180 chars)`
+      );
       const fullString = Array.isArray(item.fullText)
         ? item.fullText.join('\n')
         : typeof item.fullText === 'string'
         ? item.fullText
         : (item.paragraphs || []).join('\n');
-      assert.ok(fullString.length > 200, `Text too short on ${item.id}`);
+      const minTextChars = item.categoryKey === 'poem' ? 80 : 400;
+      assert.ok(
+        fullString.length >= minTextChars,
+        `Text too short on ${item.id} (${fullString.length} chars, min ${minTextChars})`
+      );
       assert.ok(Array.isArray(item.analysis), `Analysis must be an array on ${item.id}`);
       assert.equal(
         item.analysis.length,
@@ -262,7 +272,8 @@ describe('Bradbury 1000 — Dataset Verbatim & 5-Paragraph Analysis Integrity', 
     }
   });
 
-  it('verifies all 20 Korea & San Francisco dispatches include 4 verified historical sources', () => {
+  it('verifies all 100 Personal (50 Korea + 50 San Francisco) dispatches include 4 verified historical sources', () => {
+    assert.equal(catalog.personal.length, 100);
     for (const item of catalog.personal) {
       assert.ok(Array.isArray(item.sources), `Missing sources array on ${item.id}`);
       assert.ok(
@@ -278,7 +289,7 @@ describe('Bradbury 1000 — Dataset Verbatim & 5-Paragraph Analysis Integrity', 
     }
   });
 
-  it('enforces the 20-Minute Audio Rule (~3,000 words at 150 WPM) on all 20 Korea & San Francisco stories', () => {
+  it('enforces the 20-Minute Audio Rule (~3,000 words at 150 WPM) on all 100 Personal (50 Korea & 50 SF) stories', () => {
     assert.equal(PERSONAL_STORY_AUDIO_RULE.targetAudioMinutes, 20);
     for (const item of catalog.personal) {
       const metrics = computeStoryAudioMetrics(item);
@@ -303,4 +314,5 @@ describe('Bradbury 1000 — Dataset Verbatim & 5-Paragraph Analysis Integrity', 
     }
   });
 });
+
 

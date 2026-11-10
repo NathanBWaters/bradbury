@@ -18,6 +18,10 @@ export function formatFullPlainTextForElevenReader(item, includeAnalysis = true)
     headerLines.push(item.epigraph, '');
   }
 
+  if (includeAnalysis && item.keyContext) {
+    headerLines.push('Key Context & Why It Matters:', item.keyContext, '', '---', '');
+  }
+
   let bodyText = '';
   if (Array.isArray(item.fullText)) {
     bodyText = item.fullText.join('\n\n');

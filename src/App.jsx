@@ -128,7 +128,7 @@ export default function App() {
       const hashMatch = window.location.hash.match(/#\/?read\/day-(\d+)\/([a-z]+)/i);
       const match = pathMatch || hashMatch;
       if (match) {
-        const nightNum = Math.max(1, Math.min(10, parseInt(match[1], 10) || 1));
+        const nightNum = Math.max(1, Math.min(100, parseInt(match[1], 10) || 1));
         const slotKey = match[2].toLowerCase();
         let foundItem = null;
         if (slotKey === 'poem') {

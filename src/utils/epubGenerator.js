@@ -183,6 +183,14 @@ function renderItemBodyHtml(item, slotLabel, includeAnalysis = true) {
     `;
   }
 
+  const keyContextText = item.keyContext || item.analysis?.[0]?.paragraph || '';
+  const keyContextHtml =
+    includeAnalysis && keyContextText
+      ? `<div class="analysis-block"><h3>Key Context &amp; Why It Matters</h3><p>${escapeXml(
+          keyContextText
+        )}</p></div>`
+      : '';
+
   return `<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
@@ -198,6 +206,7 @@ function renderItemBodyHtml(item, slotLabel, includeAnalysis = true) {
     <h1>${escapeXml(item.title)}</h1>
     <p class="byline">By ${escapeXml(item.author || `${item.region} Cultural Chronicle`)}</p>
     ${item.epigraph ? `<blockquote class="epigraph">${escapeXml(item.epigraph)}</blockquote>` : ''}
+    ${keyContextHtml}
     <div class="content-body">
       ${bodyHtml}
     </div>

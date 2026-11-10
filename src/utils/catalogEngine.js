@@ -34,28 +34,31 @@ export const MAIN_CATEGORIES = [
 export function buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces) {
   const poems = (poemsAndEssays?.poems || []).map((p, idx) => ({
     ...p,
+    keyContext: p.keyContext || p.analysis?.[0]?.paragraph || '',
     categoryKey: 'poem',
     slotLabel: 'Poem',
     nightNumber: p.night || idx + 1,
-    staticUrl: `/read/day-${p.night || ((idx % 10) + 1)}/poem`,
+    staticUrl: `/read/day-${p.night || idx + 1}/poem`,
     subcategory: p.genre || p.era || 'Lyric Poetry'
   }));
 
   const stories = (storiesAndPlaces?.stories || []).map((s, idx) => ({
     ...s,
+    keyContext: s.keyContext || s.analysis?.[0]?.paragraph || '',
     categoryKey: 'story',
     slotLabel: 'Short Story',
     nightNumber: s.night || idx + 1,
-    staticUrl: `/read/day-${s.night || ((idx % 10) + 1)}/story`,
+    staticUrl: `/read/day-${s.night || idx + 1}/story`,
     subcategory: s.genre || s.era || 'Literary Fiction'
   }));
 
   const essays = (poemsAndEssays?.essays || []).map((e, idx) => ({
     ...e,
+    keyContext: e.keyContext || e.analysis?.[0]?.paragraph || '',
     categoryKey: 'essay',
     slotLabel: 'Essay',
     nightNumber: e.night || idx + 1,
-    staticUrl: `/read/day-${e.night || ((idx % 10) + 1)}/essay`,
+    staticUrl: `/read/day-${e.night || idx + 1}/essay`,
     subcategory: e.genre || e.era || 'Classical Essay'
   }));
 
@@ -63,6 +66,7 @@ export function buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces) {
     const metrics = computeStoryAudioMetrics(k);
     return {
       ...k,
+      keyContext: k.keyContext || k.analysis?.[0]?.paragraph || '',
       wordCount: k.wordCount || metrics.totalWords,
       audioDurationMinutes: k.audioDurationMinutes || metrics.estimatedAudioMinutes,
       categoryKey: 'personal',
@@ -78,6 +82,7 @@ export function buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces) {
     const metrics = computeStoryAudioMetrics(s);
     return {
       ...s,
+      keyContext: s.keyContext || s.analysis?.[0]?.paragraph || '',
       wordCount: s.wordCount || metrics.totalWords,
       audioDurationMinutes: s.audioDurationMinutes || metrics.estimatedAudioMinutes,
       categoryKey: 'personal',

@@ -84,7 +84,9 @@ export default function ReadingOptionCard({
               </span>
             )
           )}
-          <span className="slot-tag">+{item.analysis?.length || 5}-Para Analysis</span>
+          <span className="slot-tag">
+            +Key Context &amp; {item.analysis?.length || 5}-Para Analysis
+          </span>
           {Array.isArray(item.sources) && item.sources.length > 0 && (
             <span className="slot-tag sources-tag">{item.sources.length} Sources Cited</span>
           )}

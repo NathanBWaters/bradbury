@@ -279,6 +279,25 @@ export default function ReaderView({
 
         {item.epigraph && <blockquote className="reader-epigraph">{item.epigraph}</blockquote>}
 
+        {/* Key Historical, Biographical & Literary Context Briefing */}
+        {(item.keyContext || item.analysis?.[0]?.paragraph) && (
+          <aside className="key-context-card" id="key-context-card" aria-label="Key Context">
+            <div className="key-context-header">
+              <Sparkles size={14} />
+              <span>Key Context &amp; Why It Matters</span>
+            </div>
+            <p
+              className="key-context-text"
+              style={{
+                fontSize: `${(0.95 * fontScale) / 100}rem`,
+                lineHeight: lineHeightObj.value - 0.12
+              }}
+            >
+              {item.keyContext || item.analysis?.[0]?.paragraph}
+            </p>
+          </aside>
+        )}
+
         {/* Verbatim Full Text with Dynamic Font Scaling & Line Spacing */}
         <div
           className="reader-body"

@@ -201,6 +201,13 @@ function renderStaticArticleHtml({ night, slotKey, slotLabel, item }) {
   )}) • ${item.readingTimeMinutes} min read
       </p>
       ${item.epigraph ? `<blockquote class="epigraph">${escapeHtml(item.epigraph)}</blockquote>` : ''}
+      ${
+        item.keyContext || item.analysis?.[0]?.paragraph
+          ? `<div class="analysis-item"><h3>Key Context &amp; Why It Matters</h3><p>${escapeHtml(
+              item.keyContext || item.analysis?.[0]?.paragraph
+            )}</p></div>`
+          : ''
+      }
       <div class="article-body">
         ${bodyContent}
       </div>
@@ -213,7 +220,7 @@ function renderStaticArticleHtml({ night, slotKey, slotLabel, item }) {
 }
 
 let count = 0;
-for (let n = 1; n <= 10; n++) {
+for (let n = 1; n <= 100; n++) {
   const poem = poemsAndEssays.poems.find((p) => p.night === n);
   const story = storiesAndPlaces.stories.find((s) => s.night === n);
   const essay = poemsAndEssays.essays.find((e) => e.night === n);
@@ -241,4 +248,5 @@ for (let n = 1; n <= 10; n++) {
   }
 }
 
-console.log(`Pre-baked ${count} distraction-free static reader pages under public/read/day-1..10/`);
+console.log(`Pre-baked ${count} distraction-free static reader pages under public/read/day-1..100/`);
+

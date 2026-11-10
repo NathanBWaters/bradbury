@@ -1123,8 +1123,39 @@ a {
   background: var(--bg-subtle);
   border-left: 3px solid var(--accent-gold);
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  margin: 0 0 1.75rem;
+  margin: 0 0 1.25rem;
   color: var(--text-secondary);
+}
+
+.key-context-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-left: 4px solid var(--accent-flame);
+  border-radius: var(--radius-md);
+  padding: 0.95rem 1.15rem;
+  margin: 0 0 1.75rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.key-context-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent-flame);
+  margin-bottom: 0.42rem;
+}
+
+.key-context-text {
+  font-family: var(--font-reading);
+  font-size: 0.95rem;
+  line-height: 1.68;
+  color: var(--text-primary);
+  margin: 0;
 }
 
 .reader-body {
