@@ -145,10 +145,7 @@ function renderItemBodyHtml(item, slotLabel, includeAnalysis = true) {
     analysisHtml = `
       <hr class="divider" />
       <section class="analysis-section">
-        <h2>Five-Paragraph Literary &amp; Cultural Analysis</h2>
-        <p class="analysis-intro">Curated commentary and Bradbury Metaphor Collision notes for ${escapeXml(
-          item.title
-        )}.</p>
+        <h2>Literary &amp; Historical Analysis</h2>
         ${item.analysis
           .map(
             (sec) => `

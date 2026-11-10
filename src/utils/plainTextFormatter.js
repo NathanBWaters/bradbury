@@ -34,7 +34,7 @@ export function formatFullPlainTextForElevenReader(item, includeAnalysis = true)
   const sections = [...headerLines, bodyText];
 
   if (includeAnalysis && Array.isArray(item.analysis) && item.analysis.length > 0) {
-    sections.push('', '---', 'Five-Paragraph Literary and Historical Analysis', '');
+    sections.push('', '---', 'Literary and Historical Analysis', '');
     item.analysis.forEach((sec) => {
       sections.push(`${sec.heading}\n${sec.paragraph}`, '');
     });

@@ -112,10 +112,10 @@ export default function ReaderView({
               id="jump-to-analysis-btn"
               className="reader-jump-pill"
               onClick={scrollToAnalysis}
-              title="Jump directly to the 5-Paragraph Literary Analysis"
+              title="Jump directly to the Literary & Historical Analysis"
             >
               <Sparkles size={12} />
-              <span>5-Para Analysis ↓</span>
+              <span>Analysis ↓</span>
             </button>
           )}
         </div>
@@ -346,17 +346,17 @@ export default function ReaderView({
           )}
         </div>
 
-        {/* 5-Paragraph Literary / Cultural Analysis at the End */}
+        {/* Literary / Cultural Analysis at the End */}
         {Array.isArray(item.analysis) && item.analysis.length > 0 && (
           <section className="analysis-panel" id="five-paragraph-analysis">
             <div className="analysis-header">
               <div>
                 <div className="reader-kicker">Post-Reading Critical Companion</div>
                 <h2 className="analysis-title">
-                  Five-Paragraph Literary &amp; Historical Analysis
+                  Literary &amp; Historical Analysis
                 </h2>
               </div>
-              <span className="slot-tag">{item.analysis.length} Paragraphs Pre-Baked</span>
+              <span className="slot-tag">{item.analysis.length} Sections</span>
             </div>
 
             {item.analysis.map((sec, idx) => (

@@ -85,7 +85,7 @@ export default function ReadingOptionCard({
             )
           )}
           <span className="slot-tag">
-            +Key Context &amp; {item.analysis?.length || 5}-Para Analysis
+            +Key Context &amp; Analysis
           </span>
           {Array.isArray(item.sources) && item.sources.length > 0 && (
             <span className="slot-tag sources-tag">{item.sources.length} Sources Cited</span>
@@ -108,7 +108,7 @@ export default function ReadingOptionCard({
             type="button"
             className="icon-btn card-eleven-btn"
             onClick={onShareElevenReader}
-            title="Share full unabridged text & 5-paragraph analysis to ElevenReader"
+            title="Share full unabridged text, key context & analysis to ElevenReader"
           >
             <Share2 size={14} />
             <span>ElevenReader</span>

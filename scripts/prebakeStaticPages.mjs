@@ -55,7 +55,7 @@ function renderStaticArticleHtml({ night, slotKey, slotLabel, item }) {
     ? `
     <hr />
     <section class="analysis">
-      <h2>Five-Paragraph Literary &amp; Historical Analysis</h2>
+      <h2>Literary &amp; Historical Analysis</h2>
       ${item.analysis
         .map(
           (sec) => `
@@ -94,10 +94,10 @@ function renderStaticArticleHtml({ night, slotKey, slotLabel, item }) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${escapeHtml(item.title)} — ${escapeHtml(
     item.author || item.region || 'Bradbury 1000'
-  )} (Night ${night})</title>
+  )}</title>
   <meta name="author" content="${escapeHtml(item.author || item.region || 'Bradbury 1000')}" />
   <meta name="description" content="${escapeHtml(
-    item.epigraph || `${slotLabel} for Night ${night} of the Bradbury 1000 Challenge.`
+    item.epigraph || `${slotLabel}: ${item.title}`
   )}" />
   <style>
     body {
@@ -190,10 +190,10 @@ function renderStaticArticleHtml({ night, slotKey, slotLabel, item }) {
   <main>
     <div class="nav-back">
       <a href="/#/read/day-${night}/${slotKey}">← Open in Bradbury 1000 Interactive App</a>
-      <span>ElevenReader Clean Import View • Night ${night}</span>
+      <span>ElevenReader Clean Import View</span>
     </div>
     <article>
-      <div class="kicker">Bradbury 1000 • Night ${night} • ${escapeHtml(slotLabel)}</div>
+      <div class="kicker">${escapeHtml(slotLabel)} • ${escapeHtml(item.genre || item.category || '')}</div>
       <h1>${escapeHtml(item.title)}</h1>
       <p class="byline">
         ${escapeHtml(item.author || `${item.region} — ${item.subtitle}`)} (${escapeHtml(

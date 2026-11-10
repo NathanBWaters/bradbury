@@ -121,14 +121,14 @@ describe('Bradbury 1000 — ElevenReader Plain-Text Share Formatter', () => {
     assert.ok(formatted.includes(story.title), 'Formatted share text must include title');
     assert.ok(formatted.includes(story.author), 'Formatted share text must include author');
     assert.ok(
-      formatted.includes('Five-Paragraph Literary and Historical Analysis'),
-      'Formatted share text must include the 5-paragraph analysis section header'
+      formatted.includes('Literary and Historical Analysis'),
+      'Formatted share text must include the analysis section header'
     );
     for (const sec of story.analysis) {
-      assert.ok(formatted.includes(sec.heading), 'All 5 analysis headings must be included');
+      assert.ok(formatted.includes(sec.heading), 'All analysis headings must be included');
       assert.ok(
         formatted.includes(sec.paragraph.slice(0, 60)),
-        'All 5 analysis paragraphs must be included'
+        'All analysis paragraphs must be included'
       );
     }
   });
@@ -174,7 +174,7 @@ describe('Bradbury 1000 — Spec-Compliant Pure-JS EPUB 2/3 Generator', () => {
     const sample = catalog.poem[0];
     const epubBlob = buildEpubBlob({
       title: sample.title,
-      subtitle: 'Bradbury 1000 Night 1 Poem',
+      subtitle: 'Poem Edition',
       author: sample.author,
       uid: 'bradbury-test-poem-1',
       chapters: [{ item: sample, slotLabel: 'Poem' }],
@@ -202,7 +202,7 @@ describe('Bradbury 1000 — Spec-Compliant Pure-JS EPUB 2/3 Generator', () => {
     assert.ok(asciiText.includes('OEBPS/toc.ncx'));
     assert.ok(asciiText.includes('OEBPS/chapter_1.xhtml'));
     assert.ok(asciiText.includes('Key Context &amp; Why It Matters'));
-    assert.ok(asciiText.includes('Five-Paragraph Literary &amp; Cultural Analysis'));
+    assert.ok(asciiText.includes('Literary &amp; Historical Analysis'));
   });
 });
 
@@ -231,7 +231,7 @@ describe('Bradbury 1000 — 2-Tier Duolingo Streak Engine', () => {
   });
 });
 
-describe('Bradbury 1000 — Dataset Verbatim, Key Context & 5-Paragraph Analysis Integrity (400 Works)', () => {
+describe('Bradbury 1000 — Dataset Verbatim, Key Context & Single-Text Analysis Integrity (400 Works)', () => {
   const catalog = buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces);
   const allWorks = [
     ...catalog.poem,
@@ -240,8 +240,11 @@ describe('Bradbury 1000 — Dataset Verbatim, Key Context & 5-Paragraph Analysis
     ...catalog.personal
   ];
 
-  it('verifies all 400 works have complete text, Key Context briefing, and a 5-paragraph analysis', () => {
+  it('verifies all 400 works have complete text, Key Context briefing, and focused 4-section single-text analysis without bundle wrap-ups', () => {
     assert.equal(allWorks.length, 400);
+    const forbiddenBundleRx =
+      /\b(Metaphor\s+Collision|Bradbury\s+Collision|Night\s+\d+|side\s+by\s+side\s+with\s+classic|Pairing\s+this\s+Night|tonight's\s+poem|tonight's\s+short\s+story|tonight's\s+essay|reading\s+sequence)\b/i;
+
     for (const item of allWorks) {
       assert.ok(item.title && item.title.length > 1, `Missing title on ${item.id}`);
       assert.ok(
@@ -252,6 +255,11 @@ describe('Bradbury 1000 — Dataset Verbatim, Key Context & 5-Paragraph Analysis
       assert.ok(
         item.keyContext && item.keyContext.length >= 180,
         `Work ${item.id} (${item.title}) must have a rich keyContext briefing (>=180 chars)`
+      );
+      assert.equal(
+        forbiddenBundleRx.test(item.keyContext),
+        false,
+        `Work ${item.id} keyContext must not contain bundle/sequence references`
       );
       const fullString = Array.isArray(item.fullText)
         ? item.fullText.join('\n')
@@ -266,9 +274,16 @@ describe('Bradbury 1000 — Dataset Verbatim, Key Context & 5-Paragraph Analysis
       assert.ok(Array.isArray(item.analysis), `Analysis must be an array on ${item.id}`);
       assert.equal(
         item.analysis.length,
-        5,
-        `Work ${item.id} (${item.title}) must have exactly 5 analysis paragraphs, found ${item.analysis.length}`
+        4,
+        `Work ${item.id} (${item.title}) must have 4 single-text analysis sections (no bundle wrap-up), found ${item.analysis.length}`
       );
+      for (const sec of item.analysis) {
+        assert.equal(
+          forbiddenBundleRx.test(sec.heading + ' ' + sec.paragraph),
+          false,
+          `Work ${item.id} analysis section "${sec.heading}" must focus only on the single text without bundle/Night-N wrap-ups`
+        );
+      }
     }
   });
 

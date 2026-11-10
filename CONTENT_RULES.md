@@ -10,19 +10,19 @@ Every category in Bradbury 1000 contains **100 complete works** (`400` works tot
 
 ---
 
-## 2. Mandatory Key Context & 5-Paragraph Literary Analysis (All 400 Works)
+## 2. Single-Text Focus for Key Context & Analysis (No Bundle Wrap-Ups)
 
-Every single work across **Poems**, **Short Stories**, **Essays**, and **Personal (Korea & San Francisco)** MUST include:
-1. **Key Context (`keyContext`)**:
-   - A rich `100–165 word` (`>= 180 characters`) pre-reading historical, biographical, and literary briefing explaining the work's publication origin, cultural moment, and why it matters.
-   - Displayed prominently in the `#key-context-card` callout box at the top of [`ReaderView.jsx`](file:///home/antigravity/NathanBWaters/bradbury/src/components/ReaderView.jsx), included in ElevenReader plain-text exports ([`plainTextFormatter.js`](file:///home/antigravity/NathanBWaters/bradbury/src/utils/plainTextFormatter.js)), `.epub` downloads ([`epubGenerator.js`](file:///home/antigravity/NathanBWaters/bradbury/src/utils/epubGenerator.js)), and pre-baked static HTML pages ([`prebakeStaticPages.mjs`](file:///home/antigravity/NathanBWaters/bradbury/scripts/prebakeStaticPages.mjs)).
-2. **5-Paragraph Post-Reading Analysis (`analysis`)**:
-   - Exactly `5` structured analytical sections (`title` + `body` of `100–150 words` each):
-     - `I. Historical & Biographical Context` (or *Historical & Archival Context*)
-     - `II. Core Themes & Central Metaphor` (or *Narrative Architecture & Dramatic Tension*)
-     - `III. Craft, Form & Literary/Narrative Technique`
-     - `IV. Critical Reception & Enduring Legacy`
-     - `V. Bradbury Metaphor Collision & Nightly Reflection`
+Because listeners read and listen to works in any order, **every work's Key Context and Literary/Historical Analysis MUST focus exclusively on that single text**:
+- **Never** include a "bundle analysis" wrap-up, "Bradbury Metaphor Collision", "Night N", or cross-references assuming the user read a specific other poem, story, or essay that night.
+- Every single work across **Poems**, **Short Stories**, **Essays**, and **Personal (Korea & San Francisco)** includes:
+  1. **Key Context (`keyContext`)**:
+     - A rich `100–165 word` (`>= 180 characters`) pre-reading historical, biographical, and literary briefing explaining the work's publication origin, cultural moment, and why it matters.
+  2. **4-Section Single-Text Analysis (`analysis`)**:
+     - Exactly `4` structured analytical sections (`heading` + `paragraph`) focused strictly on the single text:
+       - `I. Historical & Biographical Context` (or *1. Historical/Scientific Deep-Dive*)
+       - `II. Core Themes & Central Metaphor` (or *2. Technical/Cultural Deep-Dive*)
+       - `III. Craft, Form & Literary/Narrative Technique` (or *3. Key Concepts & Vocabulary/Landmarks to Remember*)
+       - `IV. Critical Reception & Enduring Legacy` (or *4. Where to Walk This Story Today*)
 
 ---
 
@@ -34,9 +34,9 @@ Every **Korea** (`korea-1`..`korea-50`) and **San Francisco** (`sf-1`..`sf-50`) 
 - **Standard Narration Speaking Rate**: `150 words per minute (WPM)` (ElevenReader / audiobook literary narration pace).
 - **Target Audio Duration**: **~20 minutes of audio** (`18–22 minutes`).
 - **Required Word Count per Story**:
-  - **Total Narrated Words (`paragraphs` + 5-paragraph `analysis`)**: **`2,750 – 3,300 words`** (target `~3,000 words`).
+  - **Total Narrated Words (`paragraphs` + `analysis`)**: **`2,750 – 3,300 words`** (target `~3,000 words`).
   - **Narrative Body (`paragraphs`)**: **`2,150 – 2,600 words`** structured across `14–18` richly detailed longform narrative non-fiction paragraphs.
-  - **5-Paragraph Cultural & Historical Analysis (`analysis`)**: **`600 – 750 words`** across `5` titled analytical sections (`I` through `V`).
+  - **Single-Text Cultural & Historical Analysis (`analysis`)**: **`500 – 700 words`** across `4` titled analytical sections (`1` through `4`).
 - **Metadata Fields**:
   - `readingTimeMinutes`: `20`
   - `audioDurationMinutes`: `20`
@@ -45,16 +45,8 @@ Every **Korea** (`korea-1`..`korea-50`) and **San Francisco** (`sf-1`..`sf-50`) 
 
 ---
 
-## 4. Verbatim Canonical Literature Rule (Poems, Short Stories, Essays)
-
-- **Poems (`poems`)**: 100% real, verbatim, unabridged canonical poems + `keyContext` + 5-paragraph literary analysis.
-- **Short Stories (`stories`)**: 100% real, verbatim, unabridged canonical short stories + `keyContext` + 5-paragraph literary analysis.
-- **Essays (`essays`)**: 100% real, verbatim, unabridged classical essays + `keyContext` + 5-paragraph critical commentary.
-
----
-
-## 5. Automated Enforcement
+## 4. Automated Enforcement
 
 These rules are codified and enforced in:
 - [`src/utils/catalogEngine.js`](file:///home/antigravity/NathanBWaters/bradbury/src/utils/catalogEngine.js) (`PERSONAL_STORY_AUDIO_RULE` and `computeStoryAudioMetrics`)
-- [`tests/unit/bradbury.test.mjs`](file:///home/antigravity/NathanBWaters/bradbury/tests/unit/bradbury.test.mjs) (automated unit tests verifying all 400 works, `keyContext`, 5-paragraph `analysis`, and the 20-minute audio word count threshold on all 100 Personal stories)
+- [`tests/unit/bradbury.test.mjs`](file:///home/antigravity/NathanBWaters/bradbury/tests/unit/bradbury.test.mjs) (automated unit tests verifying all 400 works, `keyContext`, 4-section single-text `analysis` with zero bundle/collision wrap-ups, and the 20-minute audio word count threshold on all 100 Personal stories)

@@ -242,7 +242,7 @@ async function runRoundTests(round = 'round1') {
     console.log('Reader View Check:', JSON.stringify(readerCheck));
     assert.ok(readerCheck.title.length > 0, 'Reader view title must be rendered');
     assert.equal(readerCheck.hasKeyContext, true, 'Reader view must render Key Context briefing card');
-    assert.equal(readerCheck.analysisCards, 5, 'Reader view must render all 5 analysis paragraphs');
+    assert.equal(readerCheck.analysisCards, 4, 'Reader view must render all 4 single-text analysis sections');
 
     const outReader = `/tmp/${round}_mobile_reader.png`;
     await cdp.screenshot(outReader);
