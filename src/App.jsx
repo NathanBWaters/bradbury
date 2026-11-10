@@ -9,7 +9,8 @@ import {
   getSubcategoriesForCategory,
   filterAndPartitionItems,
   computeStreakStats,
-  getNextRecommendedPillar
+  getNextRecommendedPillar,
+  markItemCompletedState
 } from './utils/catalogEngine.js';
 import { formatFullPlainTextForElevenReader } from './utils/plainTextFormatter.js';
 import TopBar from './components/TopBar.jsx';
@@ -305,6 +306,17 @@ export default function App() {
     );
   }
 
+  function markItemCompleted(item, source = 'elevenreader') {
+    setUserState((prev) => {
+      const nextState = {
+        ...prev,
+        completedItems: markItemCompletedState(prev.completedItems, item, source)
+      };
+      saveState(nextState);
+      return nextState;
+    });
+  }
+
   async function handleElevenReaderShare(item, mode = 'text') {
     const includeAnalysis = userState.profile.includeAnalysisInEpub !== false;
     const fullTextPayload = formatFullPlainTextForElevenReader(item, includeAnalysis);
@@ -327,11 +339,15 @@ export default function App() {
           type: 'application/epub+zip'
         });
         if (navigator.canShare({ files: [file] })) {
-          await navigator.share({
+          const sharePromise = navigator.share({
             title: `${item.title} — ${item.author || item.region}`,
             files: [file]
           });
-          showToastMessage(`Shared "${item.title}.epub" directly to ElevenReader!`);
+          markItemCompleted(item, 'elevenreader-epub');
+          await sharePromise;
+          showToastMessage(
+            `Shared "${item.title}.epub" to ElevenReader & marked as completed!`
+          );
           return;
         }
       } catch {
@@ -341,27 +357,33 @@ export default function App() {
 
     if (navigator.share) {
       try {
-        await navigator.share({
+        const sharePromise = navigator.share({
           title: `${item.title} — ${item.author || item.region}`,
           text: fullTextPayload
         });
+        markItemCompleted(item, 'elevenreader');
+        await sharePromise;
         showToastMessage(
-          `Sent full text & 5-paragraph analysis of "${item.title}" to ElevenReader!`
+          `Sent "${item.title}" to ElevenReader & marked as completed!`
         );
         return;
       } catch {
-        // user canceled or desktop fallback
+        // user canceled or desktop fallback — ensure item is still marked completed
+        markItemCompleted(item, 'elevenreader');
       }
     }
+
+    markItemCompleted(item, 'elevenreader');
 
     try {
       await navigator.clipboard.writeText(fullTextPayload);
       showToastMessage(
-        `Copied complete text & 5-paragraph analysis of "${item.title}" to clipboard for ElevenReader!`
+        `Sent "${item.title}" to ElevenReader (copied full text) & marked as completed!`
       );
     } catch {
       const cleanUrl = `${window.location.origin}${item.staticUrl || ''}`;
       window.open(cleanUrl, '_blank', 'noopener,noreferrer');
+      showToastMessage(`Opened "${item.title}" for ElevenReader & marked as completed!`);
     }
   }
 

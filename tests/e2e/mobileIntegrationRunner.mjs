@@ -211,6 +211,25 @@ async function runRoundTests(round = 'round1') {
     assert.equal(completionState.grayedCards, 1, '1 card must be in grayed-out completed section');
     assert.equal(completionState.unreadCards, 13, '13 unread stories should remain at top');
 
+    // 3b. Click 'ElevenReader' on the next unread card -> verify it also auto-marks as Completed!
+    await cdp.eval(`document.querySelector('#unread-options-grid .slot-card .card-eleven-btn').click()`);
+    await sleep(500);
+    const elevenCompletionState = await cdp.eval(`(() => ({
+      grayedCards: document.querySelectorAll('.slot-card.completed-grayed').length,
+      unreadCards: document.querySelectorAll('#unread-options-grid .slot-card').length
+    }))()`);
+    console.log('ElevenReader Auto-Complete Check:', JSON.stringify(elevenCompletionState));
+    assert.equal(
+      elevenCompletionState.grayedCards,
+      2,
+      'Clicking ElevenReader must automatically mark the card as completed (2 total completed)'
+    );
+    assert.equal(
+      elevenCompletionState.unreadCards,
+      12,
+      '12 unread stories should remain at top after ElevenReader auto-complete'
+    );
+
     // 4. Open Reader View on first unread story
     await cdp.eval(`document.querySelector('#unread-options-grid .slot-card .card-read-btn').click()`);
     await sleep(600);

@@ -12,7 +12,8 @@ import {
   filterAndPartitionItems,
   computeStreakStats,
   getNextRecommendedPillar,
-  computeStoryAudioMetrics
+  computeStoryAudioMetrics,
+  markItemCompletedState
 } from '../../src/utils/catalogEngine.js';
 import { formatFullPlainTextForElevenReader } from '../../src/utils/plainTextFormatter.js';
 import { buildEpubBlob } from '../../src/utils/epubGenerator.js';
@@ -146,6 +147,23 @@ describe('Bradbury 1000 — ElevenReader Plain-Text Share Formatter', () => {
   it('returns empty string safely on null or undefined item', () => {
     assert.equal(formatFullPlainTextForElevenReader(null), '');
     assert.equal(formatFullPlainTextForElevenReader(undefined), '');
+  });
+
+  it('automatically marks an item as completed when sent to ElevenReader and moves it to Completed', () => {
+    const targetItem = catalog.personal[0];
+    const updatedCompleted = markItemCompletedState({}, targetItem, 'elevenreader');
+    assert.equal(updatedCompleted[targetItem.id]?.completed, true);
+    assert.equal(updatedCompleted[targetItem.id]?.completedVia, 'elevenreader');
+
+    const partitioned = filterAndPartitionItems(
+      catalog,
+      'personal',
+      'All',
+      updatedCompleted
+    );
+    assert.equal(partitioned.completedCategoryItems.length, 1);
+    assert.equal(partitioned.completedCategoryItems[0].id, targetItem.id);
+    assert.equal(partitioned.unreadItems.length, 19);
   });
 });
 

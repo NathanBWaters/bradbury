@@ -306,3 +306,24 @@ export function computeStoryAudioMetrics(item) {
   };
 }
 
+/**
+ * Marks a reading item as completed (e.g., when sent to ElevenReader or explicitly checked off).
+ */
+export function markItemCompletedState(
+  completedItems = {},
+  item,
+  source = 'elevenreader',
+  timestamp = new Date().toISOString()
+) {
+  if (!item || !item.id) return completedItems;
+  return {
+    ...completedItems,
+    [item.id]: {
+      completed: true,
+      completedAt: completedItems[item.id]?.completedAt || timestamp,
+      completedVia: source,
+      categoryKey: item.categoryKey
+    }
+  };
+}
+
