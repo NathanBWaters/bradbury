@@ -2,11 +2,19 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/__/auth/:path*",
+      "destination": "https://noi-book-app.firebaseapp.com/__/auth/:path*"
+    },
+    {
+      "source": "/__/firebase/:path*",
+      "destination": "https://noi-book-app.firebaseapp.com/__/firebase/:path*"
+    },
+    {
       "source": "/read/:night/:slot",
       "destination": "/read/:night/:slot/index.html"
     },
     {
-      "source": "/((?!read/|epubs/|assets/).*)",
+      "source": "/((?!read/|epubs/|assets/|__/).*)",
       "destination": "/index.html"
     }
   ]

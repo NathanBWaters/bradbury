@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Sparkles } from 'lucide-react';
 import poemsAndEssays from './data/poemsAndEssays.json';
 import storiesAndPlaces from './data/storiesAndPlaces.json';
@@ -13,6 +13,16 @@ import {
   markItemCompletedState
 } from './utils/catalogEngine.js';
 import { formatFullPlainTextForElevenReader } from './utils/plainTextFormatter.js';
+import { parseLocation, categoryPath, itemPath } from './utils/router.js';
+import {
+  onUserChange,
+  signInWithGoogle,
+  signOut,
+  syncablePart,
+  watchProgress,
+  writeProgress
+} from './utils/cloud.js';
+import { mergeProgress, progressKey } from './utils/progressMerge.js';
 import TopBar from './components/TopBar.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import CategoryDeck from './components/CategoryDeck.jsx';
@@ -35,8 +45,6 @@ const THEME_COLORS = {
 
 const DEFAULT_USER_STATE = {
   profile: {
-    name: 'Nathan Waters',
-    email: 'watersnathan1@gmail.com',
     elevenReaderToken: '',
     includeAnalysisInEpub: true,
     theme: 'parchment',
@@ -64,6 +72,23 @@ function loadState() {
   }
 }
 
+/** Apply a synced { completedItems, externalLogs, prefs } onto full user state. */
+function applySyncable(state, synced) {
+  const prefs = Object.fromEntries(
+    Object.entries(synced.prefs || {}).filter(([, v]) => v !== undefined && v !== null)
+  );
+  return {
+    ...state,
+    completedItems: synced.completedItems || {},
+    externalLogs: synced.externalLogs || [],
+    profile: { ...state.profile, ...prefs }
+  };
+}
+
+function readerFor(item) {
+  return { item, categoryKey: item.categoryKey, slotLabel: item.slotLabel };
+}
+
 function saveState(state) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -74,18 +99,27 @@ function saveState(state) {
 
 export default function App() {
   const [userState, setUserState] = useState(() => loadState());
-  const [selectedCategory, setSelectedCategory] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    const cat = params.get('category');
-    return ['poem', 'story', 'essay', 'personal'].includes(cat) ? cat : 'story';
-  });
+  const allItemsByCategory = useMemo(
+    () => buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces),
+    []
+  );
+  const initialRoute = useMemo(() => parseLocation(window.location, allItemsByCategory), [allItemsByCategory]);
+  const [selectedCategory, setSelectedCategory] = useState(initialRoute.categoryKey);
   const [selectedSubcategory, setSelectedSubcategory] = useState('All');
-  const [activeReader, setActiveReader] = useState(null);
+  const [activeReader, setActiveReader] = useState(() =>
+    initialRoute.item ? readerFor(initialRoute.item) : null
+  );
   const [showExternalModal, setShowExternalModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showPwaModal, setShowPwaModal] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [toast, setToast] = useState(null);
+  // undefined = Firebase still restoring the session; null = signed out.
+  const [authUser, setAuthUser] = useState(undefined);
+  const [syncStatus, setSyncStatus] = useState('idle');
+  const userStateRef = useRef(userState);
+  userStateRef.current = userState;
+  const lastSyncedKey = useRef(null);
 
   const showToastMessage = (msg) => {
     setToast(msg);
@@ -116,48 +150,107 @@ export default function App() {
     saveState(userState);
   }, [userState]);
 
-  const allItemsByCategory = useMemo(
-    () => buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces),
-    []
-  );
+  // ---- Account sign-in & cross-device progress sync ----
+  useEffect(() => onUserChange((u) => setAuthUser(u)), []);
 
-  // Support URL hash / path routing for clean reader links
   useEffect(() => {
-    const parseLocationForReader = () => {
-      const pathMatch = window.location.pathname.match(/\/read\/day-(\d+)\/([a-z]+)/i);
-      const hashMatch = window.location.hash.match(/#\/?read\/day-(\d+)\/([a-z]+)/i);
-      const match = pathMatch || hashMatch;
-      if (match) {
-        const nightNum = Math.max(1, Math.min(100, parseInt(match[1], 10) || 1));
-        const slotKey = match[2].toLowerCase();
-        let foundItem = null;
-        if (slotKey === 'poem') {
-          foundItem = allItemsByCategory.poem.find((x) => x.nightNumber === nightNum);
-        } else if (slotKey === 'story') {
-          foundItem = allItemsByCategory.story.find((x) => x.nightNumber === nightNum);
-        } else if (slotKey === 'essay') {
-          foundItem = allItemsByCategory.essay.find((x) => x.nightNumber === nightNum);
-        } else if (slotKey === 'korea') {
-          foundItem = allItemsByCategory.personal.find(
-            (x) => x.region === 'Korea' && x.nightNumber === nightNum
-          );
-        } else if (slotKey === 'sf') {
-          foundItem = allItemsByCategory.personal.find(
-            (x) => x.region === 'San Francisco' && x.nightNumber === nightNum
-          );
+    lastSyncedKey.current = null;
+    if (!authUser) return undefined;
+    const uid = authUser.uid;
+    setSyncStatus('syncing');
+    let firstSnapshot = true;
+    const unsubscribe = watchProgress(
+      uid,
+      (remote) => {
+        const local = syncablePart(userStateRef.current);
+        // First sync on this device: combine what's here with the account so
+        // nothing read on either side is lost. Later: account wins for prefs.
+        const merged = remote
+          ? mergeProgress(local, remote, { preferRemotePrefs: true })
+          : local;
+        const mergedKey = progressKey(merged);
+        lastSyncedKey.current = mergedKey;
+        if (progressKey(local) !== mergedKey) {
+          setUserState((prev) => applySyncable(prev, merged));
         }
-        if (foundItem) {
-          setActiveReader({
-            item: foundItem,
-            categoryKey: foundItem.categoryKey,
-            slotLabel: foundItem.slotLabel
-          });
+        if (!remote || progressKey(remote) !== mergedKey) {
+          writeProgress(uid, merged).catch(() => setSyncStatus('error'));
         }
+        if (firstSnapshot && remote && progressKey(local) !== mergedKey) {
+          showToastMessage('Synced your progress from your account.');
+        }
+        firstSnapshot = false;
+        setSyncStatus('synced');
+      },
+      (err) => {
+        console.warn('Progress sync failed', err);
+        setSyncStatus('error');
+      }
+    );
+    return unsubscribe;
+  }, [authUser?.uid]);
+
+  // Push local changes (marking a work read, logging a book, prefs) to the account.
+  useEffect(() => {
+    if (!authUser || lastSyncedKey.current === null) return undefined;
+    const syncable = syncablePart(userState);
+    const key = progressKey(syncable);
+    if (key === lastSyncedKey.current) return undefined;
+    const uid = authUser.uid;
+    const t = setTimeout(() => {
+      lastSyncedKey.current = key;
+      writeProgress(uid, syncable)
+        .then(() => setSyncStatus('synced'))
+        .catch(() => setSyncStatus('error'));
+    }, 600);
+    return () => clearTimeout(t);
+  }, [userState, authUser]);
+
+  async function handleSignIn() {
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      console.warn('Sign-in failed', err);
+      showToastMessage(`Sign-in failed: ${err?.code || err?.message || 'unknown error'}`);
+    }
+  }
+
+  async function handleSignOut() {
+    await signOut();
+    setShowProfileModal(false);
+    showToastMessage('Signed out. Progress on this device stays here until you sign in again.');
+  }
+
+  // Menu scroll position to restore once the menu has re-rendered after Back.
+  const pendingMenuScroll = useRef(null);
+  useLayoutEffect(() => {
+    if (!activeReader && pendingMenuScroll.current !== null) {
+      window.scrollTo(0, pendingMenuScroll.current);
+      pendingMenuScroll.current = null;
+    }
+  }, [activeReader]);
+
+  // History-API routing: every work has its own URL (/poems/poem-12), so the
+  // browser / Android back button returns to the menu and forward re-opens it.
+  useEffect(() => {
+    if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
+    const { canonical } = parseLocation(window.location, allItemsByCategory);
+    if (canonical !== window.location.pathname || window.location.hash || window.location.search) {
+      window.history.replaceState(window.history.state, '', canonical);
+    }
+    const onPopState = (event) => {
+      const route = parseLocation(window.location, allItemsByCategory);
+      setSelectedCategory(route.categoryKey);
+      if (route.item) {
+        setActiveReader(readerFor(route.item));
+        window.scrollTo(0, 0);
+      } else {
+        pendingMenuScroll.current = event.state?.menuScrollY || 0;
+        setActiveReader(null);
       }
     };
-    parseLocationForReader();
-    window.addEventListener('hashchange', parseLocationForReader);
-    return () => window.removeEventListener('hashchange', parseLocationForReader);
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
   }, [allItemsByCategory]);
 
   const streakStats = useMemo(
@@ -204,25 +297,38 @@ export default function App() {
   function handleSelectCategory(catKey) {
     setSelectedCategory(catKey);
     setSelectedSubcategory('All');
-    if (activeReader) {
-      closeReader();
-    }
+    setActiveReader(null);
+    // Switching category tabs replaces the menu entry rather than stacking
+    // history, so Back from a work always lands on the menu you came from.
+    window.history.replaceState({ menuScrollY: 0 }, '', categoryPath(catKey));
+    window.scrollTo(0, 0);
   }
 
   function openReader(item) {
-    setActiveReader({
-      item,
-      categoryKey: item.categoryKey,
-      slotLabel: item.slotLabel
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Remember where the menu was scrolled so Back returns to the same spot.
+    window.history.replaceState(
+      { ...(window.history.state || {}), menuScrollY: window.scrollY },
+      '',
+      window.location.pathname
+    );
+    window.history.pushState({ openedFromMenu: true }, '', itemPath(item));
+    setSelectedCategory(item.categoryKey);
+    setActiveReader(readerFor(item));
+    window.scrollTo(0, 0);
   }
 
   function closeReader() {
-    setActiveReader(null);
-    if (window.location.hash) {
-      window.history.replaceState(null, '', window.location.pathname);
+    if (activeReader && window.history.state?.openedFromMenu) {
+      // Same as pressing the browser's Back button.
+      window.history.back();
+      return;
     }
+    // Opened from a direct link: there is no menu entry behind us, so swap to it.
+    const cat = activeReader?.categoryKey || selectedCategory;
+    window.history.replaceState({ menuScrollY: 0 }, '', categoryPath(cat));
+    setSelectedCategory(cat);
+    setActiveReader(null);
+    window.scrollTo(0, 0);
   }
 
   function toggleItemCompleted(item) {
@@ -234,7 +340,8 @@ export default function App() {
         [item.id]: {
           completed: nextDone,
           completedAt: nextDone ? new Date().toISOString() : null,
-          categoryKey: item.categoryKey
+          categoryKey: item.categoryKey,
+          updatedAt: new Date().toISOString()
         }
       };
       if (nextDone) {
@@ -267,7 +374,7 @@ export default function App() {
       .replace(/^-|-$/g, '');
     downloadEpubBlob(blob, `bradbury-${item.id}-${safeSlug}.epub`);
     showToastMessage(
-      `Downloaded "${item.title}.epub" (with 5-paragraph analysis) for ElevenReader!`
+      `Downloaded "${item.title}.epub" (with analysis) for ElevenReader!`
     );
   }
 
@@ -294,7 +401,7 @@ export default function App() {
 
     const blob = buildEpubBlob({
       title: `Bradbury 1000 — Next Unread Quartet (.epub)`,
-      subtitle: `1 Poem, 1 Short Story, 1 Essay & 1 Personal (${nextPersonal?.region}) Story + 5-Paragraph Analyses`,
+      subtitle: `1 Poem, 1 Short Story, 1 Essay & 1 Personal (${nextPersonal?.region}) Story + Analyses`,
       author: 'Bradbury 1000 Curated Anthology',
       uid: `urn:bradbury1000:next-quartet-${Date.now()}`,
       includeAnalysis: userState.profile.includeAnalysisInEpub !== false,
@@ -434,6 +541,9 @@ export default function App() {
         onDownloadUnreadBundle={handleDownloadUnreadNightBundle}
         onOpenExternalModal={() => setShowExternalModal(true)}
         onOpenProfileModal={() => setShowProfileModal(true)}
+        authUser={authUser}
+        syncStatus={syncStatus}
+        onSignIn={handleSignIn}
       />
 
       <main className="page-shell">
@@ -575,6 +685,10 @@ export default function App() {
           profile={userState.profile}
           onUpdateProfile={handleUpdateProfile}
           onClose={() => setShowProfileModal(false)}
+          authUser={authUser}
+          syncStatus={syncStatus}
+          onSignIn={handleSignIn}
+          onSignOut={handleSignOut}
         />
       )}
 

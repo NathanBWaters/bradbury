@@ -118,7 +118,7 @@ export default function ReadingOptionCard({
             type="button"
             className="icon-btn card-epub-btn"
             onClick={onDownloadEpub}
-            title="Download .epub with 5-paragraph analysis for ElevenReader"
+            title="Download .epub with analysis for ElevenReader"
           >
             <Download size={14} />
             <span>.epub</span>

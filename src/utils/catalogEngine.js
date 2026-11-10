@@ -9,19 +9,19 @@ export const MAIN_CATEGORIES = [
     key: 'poem',
     label: 'Poem',
     shortLabel: 'Poems',
-    subtitle: 'Verbatim Verse + 5-Para Analysis'
+    subtitle: 'Verbatim Verse + Deep-Dive Analysis'
   },
   {
     key: 'story',
     label: 'Short Story',
     shortLabel: 'Stories',
-    subtitle: 'Canonical Fiction + 5-Para Analysis'
+    subtitle: 'Canonical Fiction + Deep-Dive Analysis'
   },
   {
     key: 'essay',
     label: 'Essay',
     shortLabel: 'Essays',
-    subtitle: 'Classical Essays + 5-Para Commentary'
+    subtitle: 'Classical Essays + Deep-Dive Analysis'
   },
   {
     key: 'personal',
@@ -327,7 +327,8 @@ export function markItemCompletedState(
       completed: true,
       completedAt: completedItems[item.id]?.completedAt || timestamp,
       completedVia: source,
-      categoryKey: item.categoryKey
+      categoryKey: item.categoryKey,
+      updatedAt: timestamp
     }
   };
 }

@@ -61,7 +61,7 @@ function renderStaticArticleHtml({ night, slotKey, slotLabel, item }) {
           (sec) => `
         <div class="analysis-item">
           <h3>${escapeHtml(sec.heading)}</h3>
-          <p>${escapeHtml(sec.paragraph)}</p>
+          ${String(sec.paragraph).split(/\n\s*\n/).map((para) => `<p>${escapeHtml(para)}</p>`).join('')}
         </div>`
         )
         .join('\n')}

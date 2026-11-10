@@ -151,7 +151,7 @@ function renderItemBodyHtml(item, slotLabel, includeAnalysis = true) {
             (sec) => `
           <div class="analysis-block">
             <h3>${escapeXml(sec.heading)}</h3>
-            <p>${escapeXml(sec.paragraph)}</p>
+            ${String(sec.paragraph).split(/\n\s*\n/).map((para) => `<p>${escapeXml(para)}</p>`).join('')}
           </div>
         `
           )

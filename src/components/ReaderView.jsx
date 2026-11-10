@@ -99,7 +99,7 @@ export default function ReaderView({
           onClick={onCloseReader}
         >
           <ArrowLeft size={15} />
-          <span>{slotLabel}</span>
+          <span>Back</span>
         </button>
 
         <div className="reader-toolbar-center">
@@ -362,14 +362,19 @@ export default function ReaderView({
             {item.analysis.map((sec, idx) => (
               <div key={idx} className="analysis-paragraph-card">
                 <h3>{sec.heading}</h3>
-                <p
-                  style={{
-                    fontSize: `${(0.96 * fontScale) / 100}rem`,
-                    lineHeight: lineHeightObj.value - 0.08
-                  }}
-                >
-                  {sec.paragraph}
-                </p>
+                {String(sec.paragraph)
+                  .split(/\n\s*\n/)
+                  .map((para, pIdx) => (
+                    <p
+                      key={pIdx}
+                      style={{
+                        fontSize: `${(0.96 * fontScale) / 100}rem`,
+                        lineHeight: lineHeightObj.value - 0.08
+                      }}
+                    >
+                      {para}
+                    </p>
+                  ))}
               </div>
             ))}
           </section>

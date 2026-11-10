@@ -3,7 +3,7 @@
  * Ensures all 62 pre-baked readings (14 Poems, 14 Stories, 14 Essays, 20 Korea/SF Chronicles)
  * and static /read/day-* pages work seamlessly offline.
  */
-const CACHE_NAME = 'bradbury-1000-pwa-v3';
+const CACHE_NAME = 'bradbury-1000-pwa-v4';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
@@ -47,6 +47,8 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  // Firebase sign-in handler (proxied to Firebase by vercel.json) must never be cached.
+  if (url.pathname.startsWith('/__/')) return;
 
   // In Vite dev server, always use Network-First for unbundled source modules (/src/, /node_modules/, /@vite/)
   if (

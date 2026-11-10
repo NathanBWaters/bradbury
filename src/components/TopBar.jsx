@@ -7,7 +7,10 @@ import {
   PlusCircle,
   Sun,
   Moon,
-  User
+  User,
+  LogIn,
+  Cloud,
+  CloudOff
 } from 'lucide-react';
 
 export default function TopBar({
@@ -17,8 +20,12 @@ export default function TopBar({
   onCloseReader,
   onDownloadUnreadBundle,
   onOpenExternalModal,
-  onOpenProfileModal
+  onOpenProfileModal,
+  authUser,
+  syncStatus,
+  onSignIn
 }) {
+  const firstName = authUser?.displayName?.split(' ')[0] || authUser?.email?.split('@')[0] || 'Me';
   return (
     <header className="masthead" role="banner">
       <div className="masthead-inner">
@@ -105,17 +112,44 @@ export default function TopBar({
             {theme === 'nocturnal' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
-          <button
-            type="button"
-            id="profile-settings-btn"
-            className="icon-btn touch-target"
-            onClick={onOpenProfileModal}
-            title="Profile & ElevenReader Settings"
-            aria-label="Reader profile and settings"
-          >
-            <User size={16} />
-            <span className="hide-on-mobile">Nathan</span>
-          </button>
+          {authUser === null ? (
+            <button
+              type="button"
+              id="sign-in-btn"
+              className="btn-secondary touch-target"
+              onClick={onSignIn}
+              title="Sign in with Google to sync your progress across devices"
+            >
+              <LogIn size={15} />
+              <span>Sign in</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              id="profile-settings-btn"
+              className="icon-btn touch-target"
+              onClick={onOpenProfileModal}
+              title={
+                authUser
+                  ? `Signed in as ${authUser.email} — ${syncStatus === 'error' ? 'sync problem' : 'progress synced'}`
+                  : 'Profile & settings'
+              }
+              aria-label="Account and settings"
+            >
+              {authUser?.photoURL ? (
+                <img src={authUser.photoURL} alt="" className="avatar-img" referrerPolicy="no-referrer" />
+              ) : (
+                <User size={16} />
+              )}
+              <span className="hide-on-mobile">{authUser ? firstName : '…'}</span>
+              {authUser &&
+                (syncStatus === 'error' ? (
+                  <CloudOff size={13} className="sync-icon error" aria-label="Sync problem" />
+                ) : (
+                  <Cloud size={13} className={`sync-icon ${syncStatus}`} aria-label="Synced" />
+                ))}
+            </button>
+          )}
         </div>
       </div>
     </header>

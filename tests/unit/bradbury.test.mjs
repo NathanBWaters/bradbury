@@ -17,6 +17,16 @@ import {
 } from '../../src/utils/catalogEngine.js';
 import { formatFullPlainTextForElevenReader } from '../../src/utils/plainTextFormatter.js';
 import { buildEpubBlob } from '../../src/utils/epubGenerator.js';
+import { parseLocation, itemPath, categoryPath } from '../../src/utils/router.js';
+
+const LITERARY_ANALYSIS_HEADINGS = [
+  'I. What It Really Means',
+  'II. How Well It Works: A Critique',
+  'III. The Impact It Had',
+  'IV. What Readers Loved',
+  'V. What Critics Pushed Back On',
+  'VI. Its Place in the Bigger Picture'
+];
 import {
   DEFAULT_USER_STATE,
   evaluateNightStatus,
@@ -240,7 +250,7 @@ describe('Bradbury 1000 — Dataset Verbatim, Key Context & Single-Text Analysis
     ...catalog.personal
   ];
 
-  it('verifies all 400 works have complete text, Key Context briefing, and focused 4-section single-text analysis without bundle wrap-ups', () => {
+  it('verifies all 400 works have complete text, Key Context briefing, and focused single-text analysis (6-section deep dive for literature, 4 sections for Personal) without bundle wrap-ups', () => {
     assert.equal(allWorks.length, 400);
     const forbiddenBundleRx =
       /\b(Metaphor\s+Collision|Bradbury\s+Collision|Night\s+\d+|side\s+by\s+side\s+with\s+classic|Pairing\s+this\s+Night|tonight's\s+poem|tonight's\s+short\s+story|tonight's\s+essay|reading\s+sequence)\b/i;
@@ -272,11 +282,31 @@ describe('Bradbury 1000 — Dataset Verbatim, Key Context & Single-Text Analysis
         `Text too short on ${item.id} (${fullString.length} chars, min ${minTextChars})`
       );
       assert.ok(Array.isArray(item.analysis), `Analysis must be an array on ${item.id}`);
-      assert.equal(
-        item.analysis.length,
-        4,
-        `Work ${item.id} (${item.title}) must have 4 single-text analysis sections (no bundle wrap-up), found ${item.analysis.length}`
-      );
+      if (item.categoryKey === 'personal') {
+        assert.equal(
+          item.analysis.length,
+          4,
+          `Work ${item.id} (${item.title}) must have 4 single-text analysis sections (no bundle wrap-up), found ${item.analysis.length}`
+        );
+      } else {
+        // Poems, stories & essays: ~1-minute plain-prose Key Context + ~5x deep-dive analysis
+        const words = (t) => String(t || '').split(/\s+/).filter(Boolean).length;
+        const kcWords = words(item.keyContext);
+        assert.ok(
+          kcWords >= 120 && kcWords <= 190,
+          `Work ${item.id} keyContext should be ~1 minute spoken (120-190 words), found ${kcWords}`
+        );
+        assert.deepEqual(
+          item.analysis.map((sec) => sec.heading),
+          LITERARY_ANALYSIS_HEADINGS,
+          `Work ${item.id} (${item.title}) must use the 6 deep-dive analysis sections`
+        );
+        const analysisWords = item.analysis.reduce((n, sec) => n + words(sec.paragraph), 0);
+        assert.ok(
+          analysisWords >= 2300,
+          `Work ${item.id} analysis should be ~2,500+ words, found ${analysisWords}`
+        );
+      }
       for (const sec of item.analysis) {
         assert.equal(
           forbiddenBundleRx.test(sec.heading + ' ' + sec.paragraph),
@@ -331,3 +361,72 @@ describe('Bradbury 1000 — Dataset Verbatim, Key Context & Single-Text Analysis
 });
 
 
+
+describe('History-API router (each work gets its own back-button-friendly URL)', () => {
+  const catalog = buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces);
+  const loc = (pathname, search = '', hash = '') => ({ pathname, search, hash });
+
+  it('maps the root and category paths to the menu', () => {
+    assert.deepEqual(parseLocation(loc('/'), catalog), { categoryKey: 'story', item: null, canonical: '/' });
+    assert.equal(parseLocation(loc('/poems'), catalog).categoryKey, 'poem');
+    assert.equal(parseLocation(loc('/poems'), catalog).item, null);
+    assert.equal(parseLocation(loc('/personal'), catalog).categoryKey, 'personal');
+  });
+
+  it('round-trips every work through its own URL', () => {
+    for (const cat of ['poem', 'story', 'essay', 'personal']) {
+      for (const item of catalog[cat]) {
+        const route = parseLocation(loc(itemPath(item)), catalog);
+        assert.equal(route.item?.id, item.id);
+        assert.equal(route.categoryKey, cat);
+        assert.ok(itemPath(item).startsWith(categoryPath(cat) + '/'));
+      }
+    }
+  });
+
+  it('falls back to the category menu for unknown ids and upgrades legacy links', () => {
+    const unknown = parseLocation(loc('/essays/essay-9999'), catalog);
+    assert.equal(unknown.item, null);
+    assert.equal(unknown.canonical, '/essays');
+    assert.equal(parseLocation(loc('/', '?category=poem'), catalog).canonical, '/poems');
+    const legacy = parseLocation(loc('/', '', '#/read/day-3/essay'), catalog);
+    assert.equal(legacy.item?.categoryKey, 'essay');
+    assert.equal(legacy.canonical, itemPath(legacy.item));
+  });
+});
+
+describe('Cross-device progress merge', async () => {
+  const { mergeProgress, progressKey } = await import('../../src/utils/progressMerge.js');
+
+  it('unions reads from phone and laptop without losing either', () => {
+    const phone = { completedItems: { 'poem-1': { completed: true, completedAt: '2026-11-01T00:00:00Z' } } };
+    const laptop = { completedItems: { 'essay-2': { completed: true, completedAt: '2026-11-02T00:00:00Z' } } };
+    const merged = mergeProgress(phone, laptop);
+    assert.deepEqual(Object.keys(merged.completedItems).sort(), ['essay-2', 'poem-1']);
+  });
+
+  it('lets the most recent change win, so un-marking propagates', () => {
+    const older = { completedItems: { 'poem-1': { completed: true, completedAt: '2026-11-01T00:00:00Z' } } };
+    const newer = {
+      completedItems: { 'poem-1': { completed: false, completedAt: null, updatedAt: '2026-11-03T00:00:00Z' } }
+    };
+    assert.equal(mergeProgress(older, newer).completedItems['poem-1'].completed, false);
+    assert.equal(mergeProgress(newer, older).completedItems['poem-1'].completed, false);
+  });
+
+  it('dedupes external logs and prefers account prefs', () => {
+    const log = { id: 'ext-1', title: 'Dune', loggedAt: '2026-11-01T00:00:00Z' };
+    const merged = mergeProgress(
+      { externalLogs: [log], prefs: { theme: 'parchment', readerFontScale: 110 } },
+      { externalLogs: [log], prefs: { theme: 'nocturnal' } }
+    );
+    assert.equal(merged.externalLogs.length, 1);
+    assert.deepEqual(merged.prefs, { theme: 'nocturnal', readerFontScale: 110 });
+  });
+
+  it('produces an order-independent key so sync does not loop', () => {
+    const a = { completedItems: { x: { completed: true, completedAt: 't' }, y: { completedAt: 't', completed: true } } };
+    const b = { completedItems: { y: { completed: true, completedAt: 't' }, x: { completedAt: 't', completed: true } } };
+    assert.equal(progressKey(a), progressKey(b));
+  });
+});

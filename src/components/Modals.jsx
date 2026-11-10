@@ -150,7 +150,15 @@ export function ExternalBookModal({ onClose, onLogExternalReading }) {
   );
 }
 
-export function ProfileSettingsModal({ profile, onUpdateProfile, onClose }) {
+export function ProfileSettingsModal({
+  profile,
+  onUpdateProfile,
+  onClose,
+  authUser,
+  syncStatus,
+  onSignIn,
+  onSignOut
+}) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
@@ -161,26 +169,38 @@ export function ProfileSettingsModal({ profile, onUpdateProfile, onClose }) {
       >
         <h3 className="modal-heading">Reader Profile &amp; ElevenReader Settings</h3>
 
-        <div className="form-field">
-          <label htmlFor="profile-name-input">Profile Name</label>
-          <input
-            id="profile-name-input"
-            type="text"
-            className="form-input"
-            value={profile.name}
-            onChange={(e) => onUpdateProfile({ name: e.target.value })}
-          />
-        </div>
-
-        <div className="form-field">
-          <label htmlFor="profile-email-input">Account Email</label>
-          <input
-            id="profile-email-input"
-            type="email"
-            className="form-input"
-            value={profile.email}
-            onChange={(e) => onUpdateProfile({ email: e.target.value })}
-          />
+        <div className="form-field account-field">
+          <label>Account</label>
+          {authUser ? (
+            <div className="account-row">
+              {authUser.photoURL && (
+                <img src={authUser.photoURL} alt="" className="avatar-img large" referrerPolicy="no-referrer" />
+              )}
+              <div className="account-text">
+                <strong>{authUser.displayName || authUser.email}</strong>
+                <span>{authUser.email}</span>
+                <span className={`sync-note ${syncStatus}`}>
+                  {syncStatus === 'error'
+                    ? 'Could not reach the sync server — progress is saved on this device and will sync when it can.'
+                    : syncStatus === 'syncing'
+                    ? 'Syncing…'
+                    : 'Progress, streaks & settings sync across every device you sign in on.'}
+                </span>
+              </div>
+              <button type="button" className="btn-secondary" id="sign-out-btn" onClick={onSignOut}>
+                Sign out
+              </button>
+            </div>
+          ) : (
+            <div className="account-row">
+              <div className="account-text">
+                <span>Sign in to keep the same progress and streaks on your phone and laptop.</span>
+              </div>
+              <button type="button" className="btn-primary" id="modal-sign-in-btn" onClick={onSignIn}>
+                Sign in with Google
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="form-field">
@@ -205,7 +225,7 @@ export function ProfileSettingsModal({ profile, onUpdateProfile, onClose }) {
               onChange={(e) => onUpdateProfile({ includeAnalysisInEpub: e.target.checked })}
             />
             <span>
-              Include 5-Paragraph Literary &amp; Cultural Analysis in EPUB &amp; ElevenReader
+              Include Literary &amp; Cultural Analysis in EPUB &amp; ElevenReader
               exports
             </span>
           </label>
