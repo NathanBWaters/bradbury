@@ -1,0 +1,876 @@
+:root {
+  /* Warm Parchment Folio (Default) */
+  --bg-primary: hsl(38, 38%, 96%);
+  --bg-elevated: hsl(38, 45%, 98.5%);
+  --bg-subtle: hsl(36, 26%, 91.5%);
+  --bg-sunken: hsl(35, 22%, 88.5%);
+  --bg-reader: hsl(40, 48%, 97.5%);
+
+  --text-primary: hsl(24, 24%, 13%);
+  --text-secondary: hsl(24, 14%, 34%);
+  --text-muted: hsl(24, 10%, 48%);
+
+  --border-subtle: hsl(32, 18%, 83%);
+  --border-strong: hsl(28, 18%, 70%);
+
+  /* Literary Accents */
+  --accent-flame: hsl(24, 88%, 46%);
+  --accent-flame-soft: hsl(26, 90%, 92%);
+  --accent-gold: hsl(41, 88%, 40%);
+  --accent-gold-soft: hsl(44, 88%, 90%);
+  --accent-freeze: hsl(198, 76%, 38%);
+  --accent-freeze-soft: hsl(198, 75%, 91%);
+  --accent-korea: hsl(352, 65%, 42%);
+  --accent-korea-soft: hsl(352, 65%, 93%);
+  --accent-sf: hsl(14, 78%, 44%);
+  --accent-sf-soft: hsl(14, 80%, 92%);
+  --accent-success: hsl(152, 62%, 30%);
+  --accent-success-soft: hsl(150, 55%, 90%);
+
+  /* Typography */
+  --font-display: 'Instrument Serif', Georgia, serif;
+  --font-reading: 'Literata', Georgia, serif;
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Shadows & Depth */
+  --shadow-sm: 0 1px 2px rgba(28, 22, 18, 0.05);
+  --shadow-card: 0 4px 18px -4px rgba(28, 22, 18, 0.07), 0 1px 3px rgba(28, 22, 18, 0.04);
+  --shadow-modal: 0 24px 48px -12px rgba(20, 14, 10, 0.24);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+}
+
+[data-theme='nocturnal'] {
+  --bg-primary: hsl(24, 16%, 9%);
+  --bg-elevated: hsl(24, 15%, 12.5%);
+  --bg-subtle: hsl(24, 14%, 16%);
+  --bg-sunken: hsl(24, 18%, 7%);
+  --bg-reader: hsl(24, 15%, 11%);
+
+  --text-primary: hsl(38, 32%, 91%);
+  --text-secondary: hsl(34, 16%, 72%);
+  --text-muted: hsl(30, 10%, 54%);
+
+  --border-subtle: hsl(24, 12%, 21%);
+  --border-strong: hsl(28, 14%, 32%);
+
+  --accent-flame: hsl(25, 92%, 58%);
+  --accent-flame-soft: hsl(24, 48%, 18%);
+  --accent-gold: hsl(43, 92%, 56%);
+  --accent-gold-soft: hsl(42, 42%, 18%);
+  --accent-freeze: hsl(198, 82%, 58%);
+  --accent-freeze-soft: hsl(198, 40%, 18%);
+  --accent-korea: hsl(352, 76%, 64%);
+  --accent-korea-soft: hsl(352, 36%, 19%);
+  --accent-sf: hsl(16, 86%, 62%);
+  --accent-sf-soft: hsl(16, 40%, 19%);
+  --accent-success: hsl(152, 62%, 52%);
+  --accent-success-soft: hsl(152, 36%, 17%);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-card: 0 8px 24px -4px rgba(0, 0, 0, 0.45);
+  --shadow-modal: 0 28px 60px -12px rgba(0, 0, 0, 0.72);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Subtle paper grain overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.025;
+  background-image: radial-gradient(var(--text-primary) 0.65px, transparent 0.65px);
+  background-size: 14px 14px;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}
+
+/* Top Editorial Masthead */
+.masthead {
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.masthead-inner {
+  max-width: 1260px;
+  margin: 0 auto;
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.brand-group {
+  display: flex;
+  align-items: baseline;
+  gap: 0.85rem;
+}
+
+.brand-title {
+  font-family: var(--font-display);
+  font-size: 1.85rem;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  margin: 0;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.brand-subtitle {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+/* Navigation Tabs */
+.nav-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--bg-subtle);
+  padding: 0.25rem;
+  border-radius: var(--radius-md);
+}
+
+.nav-tab {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.83rem;
+  font-weight: 500;
+  padding: 0.45rem 0.85rem;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  transition: all 0.15s ease;
+}
+
+.nav-tab:hover {
+  color: var(--text-primary);
+}
+
+.nav-tab.active {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+  font-weight: 600;
+}
+
+/* Duolingo-Style 2-Tier Streak Ribbon */
+.streak-cluster {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.streak-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.36rem 0.72rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-primary);
+}
+
+.streak-pill.flame {
+  background: var(--accent-flame-soft);
+  color: var(--accent-flame);
+  border-color: transparent;
+}
+
+.streak-pill.gold {
+  background: var(--accent-gold-soft);
+  color: var(--accent-gold);
+  border-color: transparent;
+}
+
+.streak-pill.freeze {
+  background: var(--accent-freeze-soft);
+  color: var(--accent-freeze);
+  border-color: transparent;
+}
+
+.icon-btn {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  padding: 0.42rem 0.65rem;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.icon-btn:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+/* Main Container */
+.page-shell {
+  max-width: 1260px;
+  margin: 0 auto;
+  padding: 1.75rem 1.5rem 4rem;
+}
+
+/* Hero Banner for Tonight's Ritual */
+.ritual-hero {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.65rem 1.85rem;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 1.75rem;
+}
+
+.ritual-hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.night-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--accent-flame);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.35rem;
+}
+
+.boss-badge {
+  background: var(--accent-gold-soft);
+  color: var(--accent-gold);
+  padding: 0.15rem 0.55rem;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.7rem;
+}
+
+.ritual-headline {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 3.3vw, 2.75rem);
+  font-weight: 400;
+  margin: 0 0 0.4rem;
+  line-height: 1.12;
+}
+
+.ritual-quote {
+  font-family: var(--font-reading);
+  font-style: italic;
+  font-size: 0.94rem;
+  color: var(--text-secondary);
+  margin: 0;
+  max-width: 68ch;
+}
+
+/* Night Selector Strip */
+.night-selector-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 1.35rem;
+  padding-top: 1.15rem;
+  border-top: 1px solid var(--border-subtle);
+  overflow-x: auto;
+}
+
+.night-chip {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  padding: 0.42rem 0.78rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.night-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.night-chip.active {
+  background: var(--text-primary);
+  color: var(--bg-elevated);
+  border-color: var(--text-primary);
+}
+
+.night-chip.tier-gold {
+  border-color: var(--accent-gold);
+}
+
+.night-chip.tier-diamond {
+  border-color: var(--accent-success);
+}
+
+/* Action Bundle Bar (ElevenReader & EPUB Handoff) */
+.handoff-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.9rem 1.2rem;
+  margin-bottom: 1.65rem;
+}
+
+.handoff-info {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.handoff-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.btn-primary {
+  background: var(--text-primary);
+  color: var(--bg-elevated);
+  border: 1px solid var(--text-primary);
+  padding: 0.55rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.48rem;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-secondary {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  padding: 0.52rem 0.92rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.81rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-secondary:hover {
+  background: var(--bg-primary);
+  border-color: var(--text-primary);
+}
+
+/* 2-Tier Duolingo Progress Meter inside Hero */
+.tier-meter-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.95rem 1.15rem;
+  min-width: 310px;
+}
+
+.tier-meter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 0.55rem;
+}
+
+.tier-steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.35rem;
+  margin-bottom: 0.55rem;
+}
+
+.tier-step-bar {
+  height: 7px;
+  border-radius: 99px;
+  background: var(--border-subtle);
+  transition: background 0.25s ease;
+}
+
+.tier-step-bar.filled-flame {
+  background: var(--accent-flame);
+}
+
+.tier-step-bar.filled-gold {
+  background: var(--accent-gold);
+}
+
+.tier-step-bar.filled-diamond {
+  background: var(--accent-success);
+}
+
+.tier-caption {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Nightly Quartet Grid */
+.quartet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.slot-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.35rem 1.45rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.2s ease, transform 0.15s ease;
+}
+
+.slot-card:hover {
+  border-color: var(--border-strong);
+}
+
+.slot-card.completed {
+  border-color: var(--accent-success);
+}
+
+.slot-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.slot-badge {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 0.22rem 0.58rem;
+  border-radius: 4px;
+  background: var(--bg-subtle);
+  color: var(--text-secondary);
+}
+
+.slot-badge.korea {
+  background: var(--accent-korea-soft);
+  color: var(--accent-korea);
+}
+
+.slot-badge.sf {
+  background: var(--accent-sf-soft);
+  color: var(--accent-sf);
+}
+
+.slot-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.73rem;
+  color: var(--text-muted);
+}
+
+.slot-title {
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  font-weight: 400;
+  margin: 0 0 0.2rem;
+  line-height: 1.18;
+  cursor: pointer;
+}
+
+.slot-title:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.slot-author {
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin: 0 0 0.75rem;
+}
+
+.slot-epigraph {
+  font-family: var(--font-reading);
+  font-size: 0.87rem;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  margin: 0 0 1rem;
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--border-strong);
+}
+
+.slot-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1.1rem;
+}
+
+.slot-tag {
+  font-size: 0.72rem;
+  padding: 0.18rem 0.52rem;
+  border-radius: 4px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+}
+
+.slot-footer {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.slot-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  flex-wrap: wrap;
+}
+
+.check-btn {
+  border: 1px solid var(--border-strong);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  padding: 0.42rem 0.78rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all 0.15s ease;
+}
+
+.check-btn.done {
+  background: var(--accent-success-soft);
+  color: var(--accent-success);
+  border-color: var(--accent-success);
+}
+
+/* Distraction-Free In-App Reader View */
+.reader-container {
+  max-width: 780px;
+  margin: 0 auto;
+  background: var(--bg-reader);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: clamp(1.5rem, 4vw, 3.25rem);
+  box-shadow: var(--shadow-card);
+}
+
+.reader-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding-bottom: 1.25rem;
+  margin-bottom: 1.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.reader-kicker {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--accent-flame);
+  margin-bottom: 0.4rem;
+}
+
+.reader-title {
+  font-family: var(--font-display);
+  font-size: clamp(2.1rem, 4vw, 3rem);
+  font-weight: 400;
+  line-height: 1.12;
+  margin: 0 0 0.4rem;
+}
+
+.reader-byline {
+  font-family: var(--font-reading);
+  font-style: italic;
+  font-size: 1.02rem;
+  color: var(--text-secondary);
+  margin: 0 0 1.5rem;
+}
+
+.reader-epigraph {
+  font-family: var(--font-reading);
+  font-style: italic;
+  font-size: 0.98rem;
+  line-height: 1.65;
+  padding: 0.9rem 1.25rem;
+  background: var(--bg-subtle);
+  border-left: 3px solid var(--accent-gold);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  margin: 0 0 2rem;
+  color: var(--text-secondary);
+}
+
+.reader-body {
+  font-family: var(--font-reading);
+  font-size: 1.12rem;
+  line-height: 1.82;
+  color: var(--text-primary);
+}
+
+.reader-body p {
+  margin: 0 0 1.35rem;
+}
+
+.poem-stanza {
+  margin-bottom: 1.55rem;
+  padding-left: 0.5rem;
+}
+
+.poem-line {
+  margin: 0.18rem 0;
+  font-family: var(--font-reading);
+  font-size: 1.14rem;
+  line-height: 1.68;
+}
+
+/* 5-Paragraph Literary Analysis Section */
+.analysis-panel {
+  margin-top: 2.75rem;
+  padding-top: 2.25rem;
+  border-top: 2px solid var(--border-strong);
+}
+
+.analysis-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.35rem;
+}
+
+.analysis-title {
+  font-family: var(--font-display);
+  font-size: 1.85rem;
+  font-weight: 400;
+  margin: 0;
+}
+
+.analysis-paragraph-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1.15rem 1.35rem;
+  margin-bottom: 1rem;
+}
+
+.analysis-paragraph-card h3 {
+  font-family: var(--font-ui);
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-gold);
+  margin: 0 0 0.5rem;
+}
+
+.analysis-paragraph-card p {
+  font-family: var(--font-reading);
+  font-size: 0.99rem;
+  line-height: 1.72;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+/* Modals */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 12, 10, 0.55);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  z-index: 200;
+}
+
+.modal-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  max-width: 600px;
+  width: 100%;
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 1.65rem;
+  box-shadow: var(--shadow-modal);
+}
+
+.form-field {
+  margin-bottom: 1rem;
+}
+
+.form-field label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+  color: var(--text-secondary);
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.58rem 0.78rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  font-family: inherit;
+}
+
+/* Toast Notification */
+.toast-banner {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  background: var(--text-primary);
+  color: var(--bg-elevated);
+  padding: 0.78rem 1.15rem;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-modal);
+  font-size: 0.84rem;
+  font-weight: 500;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  max-width: 420px;
+}
+
+/* Table / Matrix View for 10-Night Curriculum */
+.curriculum-table-wrap {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+  box-shadow: var(--shadow-card);
+}
+
+.curriculum-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.curriculum-table th,
+.curriculum-table td {
+  padding: 0.85rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: top;
+}
+
+.curriculum-table th {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+}
+
+.curriculum-table tr:hover td {
+  background: var(--bg-primary);
+}
+
+@media (max-width: 768px) {
+  .masthead-inner {
+    padding: 0.65rem 1rem;
+  }
+  .page-shell {
+    padding: 1.15rem 1rem 3rem;
+  }
+  .ritual-hero {
+    padding: 1.2rem;
+  }
+  .quartet-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/read/:night/:slot",
+      "destination": "/read/:night/:slot/index.html"
+    },
+    {
+      "source": "/((?!read/|epubs/|assets/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
