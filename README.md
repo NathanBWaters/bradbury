@@ -19,7 +19,8 @@ Inspired by Ray Bradbury's famous lecture on creativity — **1 Poem, 1 Short St
 3. **10 Complete Essays + 5-Paragraph Critical Commentary** (+ 4 pre-baked Swap Essays):
    - Francis Bacon, Ralph Waldo Emerson, Michel de Montaigne, William James, Virginia Woolf, Henry David Thoreau, Thomas Henry Huxley, G. K. Chesterton, Bertrand Russell, and Edgar Allan Poe.
 
-4. **10 Pre-Baked Korea Stories & 10 Pre-Baked San Francisco Stories**:
+4. **10 Pre-Baked Korea Stories & 10 Pre-Baked San Francisco Stories (20-Minute Audio Rule — ~3,000 Words Each @ 150 WPM)**:
+   - **Rule Specification ([`CONTENT_RULES.md`](./CONTENT_RULES.md))**: Every Korea and San Francisco story is crafted for **~20 minutes of audio narration** (`2,750–3,300` total words at `150 WPM`: `14–18` longform narrative paragraphs + `5-paragraph` cultural & historical analysis + `4` verified archival/primary sources).
    - **Korea (10)**: King Sejong's Secret Hangul Lab (1443), Admiral Yi Sun-sin at Myeongnyang (1597), The Haenyeo of Jeju Island, Daylighting Seoul's Cheonggyecheon Stream, Gyeongju & Silla's Silk Road Golden Crowns, Onggi Breathing Jars & Gimjang Microbiology, Jikji (1377) & the Tripitaka Koreana, Euljiro's Metalwork & Print Alleys, Pansori / Han / Heung & Chungmuro Cinema, Bukchon Hanok's Ondol & Maru Thermodynamics.
    - **San Francisco (10)**: The Buried Gold Rush Fleet of Yerba Buena Cove (1849), Emperor Norton I, Andrew Hallidie's 1873 Cable Car Physics, The 1906 Earthquake & Giannini's Barrel-Top Bank, City Lights & the *Howl* Trial in North Beach, Bridging the Golden Gate in International Orange, Adolph Sutro's Glass Baths at Lands End, Look Tin Eli & Chinatown's Architectural Reinvention, Gold Rush Sourdough Microbiology & Mission Murals, Karl the Fog & the Golden Gate Wind Tunnel.
 

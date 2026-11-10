@@ -59,25 +59,35 @@ export function buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces) {
     subcategory: e.genre || e.era || 'Classical Essay'
   }));
 
-  const korea = (storiesAndPlaces?.koreaStories || []).map((k, idx) => ({
-    ...k,
-    categoryKey: 'personal',
-    slotLabel: 'Korea Deep-Dive',
-    nightNumber: k.night || idx + 1,
-    staticUrl: `/read/day-${k.night || idx + 1}/korea`,
-    subcategory: `Korea • ${k.category || 'History & Culture'}`,
-    regionGroup: 'Korea'
-  }));
+  const korea = (storiesAndPlaces?.koreaStories || []).map((k, idx) => {
+    const metrics = computeStoryAudioMetrics(k);
+    return {
+      ...k,
+      wordCount: k.wordCount || metrics.totalWords,
+      audioDurationMinutes: k.audioDurationMinutes || metrics.estimatedAudioMinutes,
+      categoryKey: 'personal',
+      slotLabel: 'Korea Deep-Dive',
+      nightNumber: k.night || idx + 1,
+      staticUrl: `/read/day-${k.night || idx + 1}/korea`,
+      subcategory: `Korea • ${k.category || 'History & Culture'}`,
+      regionGroup: 'Korea'
+    };
+  });
 
-  const sf = (storiesAndPlaces?.sfStories || []).map((s, idx) => ({
-    ...s,
-    categoryKey: 'personal',
-    slotLabel: 'San Francisco Deep-Dive',
-    nightNumber: s.night || idx + 1,
-    staticUrl: `/read/day-${s.night || idx + 1}/sf`,
-    subcategory: `San Francisco • ${s.category || 'History & Culture'}`,
-    regionGroup: 'San Francisco'
-  }));
+  const sf = (storiesAndPlaces?.sfStories || []).map((s, idx) => {
+    const metrics = computeStoryAudioMetrics(s);
+    return {
+      ...s,
+      wordCount: s.wordCount || metrics.totalWords,
+      audioDurationMinutes: s.audioDurationMinutes || metrics.estimatedAudioMinutes,
+      categoryKey: 'personal',
+      slotLabel: 'San Francisco Deep-Dive',
+      nightNumber: s.night || idx + 1,
+      staticUrl: `/read/day-${s.night || idx + 1}/sf`,
+      subcategory: `San Francisco • ${s.category || 'History & Culture'}`,
+      regionGroup: 'San Francisco'
+    };
+  });
 
   // Interleave Korea and SF 1..10 equally
   const personal = [];
@@ -251,5 +261,48 @@ export function getNextRecommendedPillar(allItemsByCategory, completedItems = {}
   }
 
   return null;
+}
+
+/**
+ * Canonical 20-Minute Audio Rule for Personal (Korea & San Francisco) Stories.
+ * At the standard literary audiobook narration pace of 150 WPM, ~20 minutes of audio
+ * requires ~3,000 total narrated words (2,750–3,300 words across body + 5-paragraph analysis).
+ */
+export const PERSONAL_STORY_AUDIO_RULE = {
+  targetAudioMinutes: 20,
+  minAudioMinutes: 18,
+  maxAudioMinutes: 23,
+  speakingRateWpm: 150,
+  minBodyWords: 2100,
+  minTotalWords: 2750
+};
+
+export function computeStoryAudioMetrics(item) {
+  if (!item) {
+    return { bodyWords: 0, analysisWords: 0, totalWords: 0, estimatedAudioMinutes: 0 };
+  }
+  const bodyStr = Array.isArray(item.paragraphs)
+    ? item.paragraphs.join(' ')
+    : Array.isArray(item.fullText)
+    ? item.fullText.join(' ')
+    : String(item.fullText || '');
+  const bodyWords = bodyStr.trim() ? bodyStr.trim().split(/\s+/).length : 0;
+
+  const analysisStr = Array.isArray(item.analysis)
+    ? item.analysis.map((sec) => `${sec.heading || ''} ${sec.paragraph || ''}`).join(' ')
+    : '';
+  const analysisWords = analysisStr.trim() ? analysisStr.trim().split(/\s+/).length : 0;
+
+  const totalWords = bodyWords + analysisWords;
+  const estimatedAudioMinutes = Math.round(
+    totalWords / PERSONAL_STORY_AUDIO_RULE.speakingRateWpm
+  );
+
+  return {
+    bodyWords,
+    analysisWords,
+    totalWords,
+    estimatedAudioMinutes
+  };
 }
 

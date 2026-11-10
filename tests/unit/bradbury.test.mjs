@@ -6,11 +6,13 @@ import { fileURLToPath } from 'node:url';
 
 import {
   MAIN_CATEGORIES,
+  PERSONAL_STORY_AUDIO_RULE,
   buildNormalizedCatalog,
   getSubcategoriesForCategory,
   filterAndPartitionItems,
   computeStreakStats,
-  getNextRecommendedPillar
+  getNextRecommendedPillar,
+  computeStoryAudioMetrics
 } from '../../src/utils/catalogEngine.js';
 import { formatFullPlainTextForElevenReader } from '../../src/utils/plainTextFormatter.js';
 import { buildEpubBlob } from '../../src/utils/epubGenerator.js';
@@ -257,4 +259,30 @@ describe('Bradbury 1000 — Dataset Verbatim & 5-Paragraph Analysis Integrity', 
       }
     }
   });
+
+  it('enforces the 20-Minute Audio Rule (~3,000 words at 150 WPM) on all 20 Korea & San Francisco stories', () => {
+    assert.equal(PERSONAL_STORY_AUDIO_RULE.targetAudioMinutes, 20);
+    for (const item of catalog.personal) {
+      const metrics = computeStoryAudioMetrics(item);
+      assert.ok(
+        metrics.bodyWords >= PERSONAL_STORY_AUDIO_RULE.minBodyWords,
+        `Personal story ${item.id} (${item.title}) bodyWords (${metrics.bodyWords}) must be >= ${PERSONAL_STORY_AUDIO_RULE.minBodyWords}`
+      );
+      assert.ok(
+        metrics.totalWords >= PERSONAL_STORY_AUDIO_RULE.minTotalWords,
+        `Personal story ${item.id} (${item.title}) totalWords (${metrics.totalWords}) must be >= ${PERSONAL_STORY_AUDIO_RULE.minTotalWords} (~20 min audio at 150 WPM)`
+      );
+      assert.ok(
+        metrics.estimatedAudioMinutes >= PERSONAL_STORY_AUDIO_RULE.minAudioMinutes &&
+          metrics.estimatedAudioMinutes <= PERSONAL_STORY_AUDIO_RULE.maxAudioMinutes,
+        `Personal story ${item.id} estimatedAudioMinutes (${metrics.estimatedAudioMinutes}m) must be between ${PERSONAL_STORY_AUDIO_RULE.minAudioMinutes}m and ${PERSONAL_STORY_AUDIO_RULE.maxAudioMinutes}m`
+      );
+      assert.equal(
+        item.readingTimeMinutes,
+        20,
+        `Personal story ${item.id} readingTimeMinutes must be 20`
+      );
+    }
+  });
 });
+
