@@ -348,18 +348,57 @@ async function runFunnelTests(tag = 'funnel') {
     await sleep(450);
     assert.equal(await cdp.eval(`location.pathname`), '/tonight', 'Reader Back must return to /tonight');
 
-    // 4. PATH B — STEP-BY-STEP TYPE & GENRE FUNNEL (/choose -> /choose/:type -> /:type?genre=...)
+    // 4. PATH B — STEP-BY-STEP TYPE & GENRE FUNNEL + TITLE SEARCH SPOTLIGHT
     await cdp.eval(`document.getElementById('bottom-nav-explore').click()`);
     await sleep(400);
     await assertCleanMobilePage(cdp, 'Choose Type (/choose)');
     const chooseTypeInfo = await cdp.eval(`(() => ({
       pathname: location.pathname,
-      cardCount: document.querySelectorAll('.type-choice-card').length
+      cardCount: document.querySelectorAll('.type-choice-card').length,
+      hasTopbarSearch: Boolean(document.getElementById('topbar-search-btn')),
+      hasExploreSearchBar: Boolean(document.getElementById('explore-search-trigger-btn'))
     }))()`);
     console.log('4a. Choose Type Step:', JSON.stringify(chooseTypeInfo));
     assert.equal(chooseTypeInfo.pathname, '/choose');
     assert.equal(chooseTypeInfo.cardCount, 4);
+    assert.equal(chooseTypeInfo.hasTopbarSearch, true, 'TopBar must include global search button');
+    assert.equal(chooseTypeInfo.hasExploreSearchBar, true, 'Explore must include inline title search bar');
     await cdp.screenshot(`/tmp/${tag}_mobile_choose_type.png`);
+
+    // Open Title Search Spotlight -> search for "Ozymandias" -> verify #1 title match & open Reader -> Back returns to /choose!
+    await cdp.eval(`document.getElementById('explore-search-trigger-btn').click()`);
+    await sleep(250);
+    await assertCleanMobilePage(cdp, 'Catalog Search Modal Open');
+    await cdp.eval(`(() => {
+      const input = document.getElementById('catalog-search-input');
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+      setter.call(input, 'Ozymandias');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    })()`);
+    await sleep(200);
+    const searchCheck = await cdp.eval(`(() => {
+      const firstRow = document.querySelector('.catalog-search-row');
+      return {
+        rowCount: document.querySelectorAll('.catalog-search-row').length,
+        firstTitle: firstRow?.querySelector('.catalog-row-title')?.textContent?.trim(),
+        hasHighlight: Boolean(firstRow?.querySelector('mark.catalog-search-mark'))
+      };
+    })()`);
+    console.log('4a-ii. Title Search Spotlight Check:', JSON.stringify(searchCheck));
+    assert.ok(searchCheck.rowCount >= 1, 'Searching Ozymandias must return matching title');
+    assert.equal(searchCheck.firstTitle, 'Ozymandias');
+    assert.equal(searchCheck.hasHighlight, true, 'Matching title fragment must be highlighted');
+    await cdp.screenshot(`/tmp/${tag}_mobile_search.png`);
+
+    await cdp.eval(`document.querySelector('.catalog-search-row').click()`);
+    await sleep(450);
+    assert.ok(
+      (await cdp.eval(`location.pathname`)).startsWith('/poems/'),
+      'Selecting Ozymandias from search must open its poem Reader URL'
+    );
+    await cdp.eval(`document.getElementById('reader-back-btn').click()`);
+    await sleep(400);
+    assert.equal(await cdp.eval(`location.pathname`), '/choose', 'Reader Back after search must return cleanly to /choose');
 
     // Step into Personal (/choose/personal) -> verify 2 Places + 5 Cross-Pacific Themes
     await cdp.eval(`document.getElementById('choose-type-personal').click()`);

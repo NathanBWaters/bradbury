@@ -15,7 +15,9 @@ import {
   dealTonightQuartet,
   pickSurpriseItem,
   computeStoryAudioMetrics,
-  markItemCompletedState
+  markItemCompletedState,
+  normalizeSearchText,
+  searchCatalog
 } from '../../src/utils/catalogEngine.js';
 import { formatFullPlainTextForElevenReader } from '../../src/utils/plainTextFormatter.js';
 import { buildEpubBlob } from '../../src/utils/epubGenerator.js';
@@ -643,3 +645,51 @@ describe('Cross-device progress merge', async () => {
     assert.equal(progressKey(a), progressKey(b));
   });
 });
+
+describe('Bradbury 1000 — Title-First Catalog Search Engine', () => {
+  const catalog = buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces);
+
+  it('normalizes diacritics, curly quotes, and punctuation cleanly', () => {
+    assert.equal(normalizeSearchText('  “An Occurrence at Owl’s—Creek!” '), "an occurrence at owl's creek");
+  });
+
+  it('returns balanced unread quick-picks and full 400 counts when query is empty', () => {
+    const emptyRes = searchCatalog(catalog, '');
+    assert.equal(emptyRes.isQueryEmpty, true);
+    assert.equal(emptyRes.countsByCategory.all, 400);
+    assert.equal(emptyRes.results.length, 8);
+  });
+
+  it('ranks exact and article-stripped title matches #1 across all 400 works', () => {
+    const targetStory = catalog.story[0];
+    const strippedTitle = targetStory.title.replace(/^(The|A|An)\s+/i, '');
+    const hit = searchCatalog(catalog, strippedTitle);
+    assert.equal(hit.isQueryEmpty, false);
+    assert.ok(hit.results.length >= 1);
+    assert.equal(hit.results[0].id, targetStory.id, 'Exact/article-stripped title must rank #1');
+  });
+
+  it('supports multi-word partial title queries, category filter pills, and zero-hit counts', () => {
+    const samplePersonal = catalog.personal[0];
+    const titleWords = samplePersonal.title
+      .split(/\s+/)
+      .filter((w) => w.length >= 4)
+      .slice(0, 2)
+      .join(' ');
+    const allSearch = searchCatalog(catalog, titleWords, { categoryKey: 'all' });
+    assert.ok(allSearch.totalAllCategories >= 1);
+    assert.ok(allSearch.countsByCategory.personal >= 1);
+
+    const poemScoped = searchCatalog(catalog, samplePersonal.title, { categoryKey: 'poem' });
+    assert.equal(poemScoped.results.length, 0);
+    assert.ok(
+      poemScoped.totalAllCategories >= 1,
+      'Must preserve totalAllCategories count so user can widen a 0-hit filtered search'
+    );
+
+    const miss = searchCatalog(catalog, 'xyzzynonexistentbook999');
+    assert.equal(miss.totalMatches, 0);
+    assert.equal(miss.totalAllCategories, 0);
+  });
+});
+

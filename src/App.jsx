@@ -52,6 +52,7 @@ import ShelfView from './components/ShelfView.jsx';
 import JournalView from './components/JournalView.jsx';
 import ReaderView from './components/ReaderView.jsx';
 import StreakCelebrationOverlay from './components/StreakCelebrationOverlay.jsx';
+import SearchModal from './components/SearchModal.jsx';
 import {
   ExternalBookModal,
   ProfileSettingsModal,
@@ -154,7 +155,9 @@ export default function App() {
     return Object.fromEntries(initialDeal.map((entry) => [entry.categoryKey, entry.item.id]));
   });
 
+  const [searchModal, setSearchModal] = useState({ open: false, category: 'all' });
   const [showExternalModal, setShowExternalModal] = useState(false);
+  const [externalInitialTitle, setExternalInitialTitle] = useState('');
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showPwaModal, setShowPwaModal] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -167,6 +170,50 @@ export default function App() {
   const lastSyncedKey = useRef(null);
 
   const soundEnabled = userState.profile.soundEnabled !== false;
+
+  const openSearchModal = useCallback((initialCategory = 'all') => {
+    setSearchModal({ open: true, category: initialCategory || 'all' });
+  }, []);
+
+  const closeSearchModal = useCallback(() => {
+    setSearchModal((prev) => (prev.open ? { ...prev, open: false } : prev));
+  }, []);
+
+  // Global Cmd+K / Ctrl+K and '/' quick-search shortcut
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchModal((prev) => ({
+          open: !prev.open,
+          category: 'all'
+        }));
+        return;
+      }
+      if (
+        e.key === '/' &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey &&
+        !showExternalModal &&
+        !showProfileModal &&
+        !showPwaModal
+      ) {
+        const tag = (e.target?.tagName || '').toLowerCase();
+        const isEditable =
+          tag === 'input' ||
+          tag === 'textarea' ||
+          tag === 'select' ||
+          e.target?.isContentEditable;
+        if (!isEditable) {
+          e.preventDefault();
+          setSearchModal({ open: true, category: 'all' });
+        }
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showExternalModal, showProfileModal, showPwaModal]);
 
   const showToastMessage = useCallback((msg) => {
     setToast(msg);
@@ -287,6 +334,7 @@ export default function App() {
 
   function navigateTo(url, { replace = false, playPop = false } = {}) {
     setCelebration(null);
+    setSearchModal((prev) => (prev.open ? { ...prev, open: false } : prev));
     if (playPop) {
       playStepPopSound(userStateRef.current.profile.soundEnabled !== false);
     }
@@ -327,6 +375,7 @@ export default function App() {
     }
     const onPopState = (event) => {
       setCelebration(null);
+      setSearchModal((prev) => (prev.open ? { ...prev, open: false } : prev));
       const route = parseLocation(window.location, allItemsByCategory);
       pendingScrollY.current = event.state?.scrollY || 0;
       applyRoute(route);
@@ -781,11 +830,17 @@ export default function App() {
         soundEnabled={soundEnabled}
         onToggleSound={handleToggleSound}
         onToggleTheme={handleToggleTheme}
+        onOpenSearch={() =>
+          openSearchModal(currentView === 'shelf' ? selectedCategory : 'all')
+        }
         onNavigateHome={() => navigateTo(homePath())}
         onNavigateTonight={() => navigateTo(tonightPath(), { playPop: true })}
         onNavigateExplore={() => navigateTo(chooseTypePath(), { playPop: true })}
         onNavigateJournal={() => navigateTo(journalPath())}
-        onOpenExternalModal={() => setShowExternalModal(true)}
+        onOpenExternalModal={() => {
+          setExternalInitialTitle('');
+          setShowExternalModal(true);
+        }}
         onOpenProfileModal={() => setShowProfileModal(true)}
         authUser={authUser}
         syncStatus={syncStatus}
@@ -830,6 +885,7 @@ export default function App() {
             streakStats={streakStats}
             soundEnabled={soundEnabled}
             onBackHome={() => navigateTo(homePath())}
+            onOpenSearch={() => openSearchModal('all')}
             onSelectType={(catKey) =>
               navigateTo(chooseGenrePath(catKey), { playPop: true })
             }
@@ -863,6 +919,7 @@ export default function App() {
             onSelectSubcategory={(subId) =>
               navigateTo(shelfPath(selectedCategory, subId), { replace: true })
             }
+            onOpenSearch={() => openSearchModal(selectedCategory)}
             onSurpriseFromShelf={() => {
               const pick = pickSurpriseItem(allItemsByCategory, userState.completedItems, {
                 categoryKey: selectedCategory,
@@ -888,7 +945,10 @@ export default function App() {
             }
             onOpenReader={openReader}
             onToggleComplete={toggleItemCompleted}
-            onOpenExternalModal={() => setShowExternalModal(true)}
+            onOpenExternalModal={() => {
+              setExternalInitialTitle('');
+              setShowExternalModal(true);
+            }}
             onDownloadUnreadBundle={() => handleDownloadQuartetBundle()}
             onOpenPwaModal={() => setShowPwaModal(true)}
           />
@@ -914,7 +974,10 @@ export default function App() {
               }
             }}
             onDownloadUnreadBundle={() => handleDownloadQuartetBundle()}
-            onOpenExternalModal={() => setShowExternalModal(true)}
+            onOpenExternalModal={() => {
+              setExternalInitialTitle('');
+              setShowExternalModal(true);
+            }}
             onOpenPwaModal={() => setShowPwaModal(true)}
             onOpenJournal={() => navigateTo(journalPath())}
           />
@@ -938,9 +1001,31 @@ export default function App() {
         onDismiss={dismissCelebration}
       />
 
+      <SearchModal
+        isOpen={searchModal.open}
+        initialCategory={searchModal.category}
+        allItemsByCategory={allItemsByCategory}
+        completedItems={userState.completedItems}
+        onClose={closeSearchModal}
+        onSelectItem={(item) => {
+          closeSearchModal();
+          playStepPopSound(soundEnabled);
+          openReader(item);
+        }}
+        onOpenExternalWithTitle={(prefillTitle) => {
+          closeSearchModal();
+          setExternalInitialTitle(prefillTitle || '');
+          setShowExternalModal(true);
+        }}
+      />
+
       {showExternalModal && (
         <ExternalBookModal
-          onClose={() => setShowExternalModal(false)}
+          initialTitle={externalInitialTitle}
+          onClose={() => {
+            setShowExternalModal(false);
+            setExternalInitialTitle('');
+          }}
           onLogExternalReading={logExternalReading}
         />
       )}

@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Smartphone, Wifi, CheckCircle2, Share2, Download } from 'lucide-react';
 
-export function ExternalBookModal({ onClose, onLogExternalReading }) {
-  const [extQuery, setExtQuery] = useState('');
+export function ExternalBookModal({ onClose, onLogExternalReading, initialTitle = '' }) {
+  const [extQuery, setExtQuery] = useState(initialTitle);
   const [extResults, setExtResults] = useState([]);
   const [extLoading, setExtLoading] = useState(false);
-  const [extCustomTitle, setExtCustomTitle] = useState('');
+  const [extCustomTitle, setExtCustomTitle] = useState(initialTitle);
   const [extCustomAuthor, setExtCustomAuthor] = useState('');
   const [extCustomSlot, setExtCustomSlot] = useState('story');
 

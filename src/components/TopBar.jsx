@@ -3,6 +3,7 @@ import {
   Flame,
   Award,
   Snowflake,
+  Search,
   PlusCircle,
   Sun,
   Moon,
@@ -21,6 +22,7 @@ export default function TopBar({
   soundEnabled = true,
   onToggleSound,
   onToggleTheme,
+  onOpenSearch,
   onNavigateHome,
   onNavigateTonight,
   onNavigateExplore,
@@ -109,6 +111,21 @@ export default function TopBar({
         </div>
 
         <div className="streak-cluster">
+          <button
+            type="button"
+            id="topbar-search-btn"
+            className="icon-btn touch-target topbar-search-btn"
+            onClick={onOpenSearch}
+            title="Search for a specific title, author, or place (⌘K / Ctrl+K)"
+            aria-label="Search titles"
+          >
+            <Search size={15} />
+            <span className="hide-on-mobile">Search</span>
+            <kbd className="topbar-kbd hide-on-mobile" aria-hidden="true">
+              ⌘K
+            </kbd>
+          </button>
+
           <button
             type="button"
             id="topbar-ledger-btn"

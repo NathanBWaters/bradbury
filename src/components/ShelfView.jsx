@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Sparkles } from 'lucide-react';
+import { ArrowLeft, Sparkles, Search } from 'lucide-react';
 import { MAIN_CATEGORIES } from '../utils/catalogEngine.js';
 import ReadingOptionCard from './ReadingOptionCard.jsx';
 import { FolioMascot } from './FolioMascot.jsx';
@@ -14,6 +14,7 @@ export default function ShelfView({
   onChangeType,
   onSelectSubcategory,
   onSurpriseFromShelf,
+  onOpenSearch,
   onOpenReader,
   onToggleComplete,
   onDownloadEpub,
@@ -73,17 +74,31 @@ export default function ShelfView({
             <h1 className="funnel-title section-heading-title">{activeGenreLabel}</h1>
           </div>
 
-          {unreadItems.length > 1 && (
-            <button
-              type="button"
-              id="shelf-surprise-btn"
-              className="btn-secondary shelf-surprise-btn"
-              onClick={onSurpriseFromShelf}
-            >
-              <Sparkles size={14} />
-              <span>Pick One For Me</span>
-            </button>
-          )}
+          <div className="shelf-header-actions">
+            {onOpenSearch && (
+              <button
+                type="button"
+                id="shelf-search-btn"
+                className="btn-secondary shelf-surprise-btn"
+                onClick={onOpenSearch}
+              >
+                <Search size={14} />
+                <span>Search</span>
+              </button>
+            )}
+
+            {unreadItems.length > 1 && (
+              <button
+                type="button"
+                id="shelf-surprise-btn"
+                className="btn-secondary shelf-surprise-btn"
+                onClick={onSurpriseFromShelf}
+              >
+                <Sparkles size={14} />
+                <span>Pick One For Me</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Compact sibling genre strip for effortless switching while browsing */}

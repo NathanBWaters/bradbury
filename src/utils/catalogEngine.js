@@ -580,3 +580,157 @@ export function pickSurpriseItem(
   const idx = Math.min(pool.length - 1, Math.max(0, Math.floor(randomValue * pool.length)));
   return pool[idx];
 }
+
+/**
+ * Normalizes text for resilient literary title/author search
+ * (strips diacritics, unifies curly apostrophes/quotes & punctuation, collapses spaces).
+ */
+export function normalizeSearchText(str) {
+  if (!str) return '';
+  return String(str)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\u2018\u2019\u02bc`]/g, "'")
+    .replace(/[\u201c\u201d]/g, '"')
+    .toLowerCase()
+    .replace(/[^a-z0-9']+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function stripLeadingArticle(normTitle) {
+  return normTitle.replace(/^(the|a|an)\s+/, '');
+}
+
+/**
+ * Title-first search across all 400 works in the Bradbury 1000 catalog.
+ * Prioritizes exact title matches, title prefixes, word-boundary title matches,
+ * and title substrings before falling back to multi-token title + author/place/genre matches.
+ */
+export function searchCatalog(
+  allItemsByCategory,
+  query = '',
+  { categoryKey = 'all', completedItems = {}, limit = 40 } = {}
+) {
+  const flatItems = [];
+  const totalCounts = { all: 0, poem: 0, story: 0, essay: 0, personal: 0 };
+
+  for (const cat of MAIN_CATEGORIES) {
+    const list = allItemsByCategory?.[cat.key] || [];
+    totalCounts[cat.key] = list.length;
+    totalCounts.all += list.length;
+    for (const item of list) {
+      flatItems.push(item);
+    }
+  }
+
+  const normQuery = normalizeSearchText(query);
+
+  // Empty query: return a calm, balanced quick-pick preview (unread first)
+  if (!normQuery) {
+    const preview = [];
+    if (categoryKey && categoryKey !== 'all') {
+      const catList = allItemsByCategory?.[categoryKey] || [];
+      const unread = catList.filter((i) => !completedItems[i.id]?.completed);
+      const source = unread.length > 0 ? unread : catList;
+      preview.push(...source.slice(0, 8));
+    } else {
+      for (let round = 0; round < 2; round++) {
+        for (const cat of MAIN_CATEGORIES) {
+          const catList = allItemsByCategory?.[cat.key] || [];
+          const unread = catList.filter((i) => !completedItems[i.id]?.completed);
+          const source = unread.length > 0 ? unread : catList;
+          if (source[round]) preview.push(source[round]);
+        }
+      }
+    }
+    return {
+      isQueryEmpty: true,
+      query: '',
+      results: preview,
+      totalMatches:
+        categoryKey && categoryKey !== 'all'
+          ? totalCounts[categoryKey] || 0
+          : totalCounts.all,
+      totalAllCategories: totalCounts.all,
+      countsByCategory: totalCounts
+    };
+  }
+
+  const queryNoArticle = stripLeadingArticle(normQuery);
+  const tokens = normQuery.split(' ').filter(Boolean);
+  const countsByCategory = { all: 0, poem: 0, story: 0, essay: 0, personal: 0 };
+  const scored = [];
+
+  for (let idx = 0; idx < flatItems.length; idx++) {
+    const item = flatItems[idx];
+    const normTitle = normalizeSearchText(item.title);
+    const normTitleNoArticle = stripLeadingArticle(normTitle);
+    const normAuthor = normalizeSearchText(item.author || item.region || item.regionGroup || '');
+    const normGenre = normalizeSearchText(
+      `${item.subcategory || ''} ${item.genre || ''} ${item.category || ''} ${item.slotLabel || ''}`
+    );
+
+    let score = 0;
+
+    if (
+      normTitle === normQuery ||
+      (queryNoArticle.length >= 2 && normTitleNoArticle === queryNoArticle)
+    ) {
+      score = 1000;
+    } else if (
+      normTitle.startsWith(normQuery) ||
+      (queryNoArticle.length >= 2 && normTitleNoArticle.startsWith(queryNoArticle))
+    ) {
+      score = 860;
+    } else if (` ${normTitle}`.includes(` ${normQuery}`)) {
+      score = 750;
+    } else if (normTitle.includes(normQuery)) {
+      score = 620;
+    } else if (tokens.length > 1 && tokens.every((t) => normTitle.includes(t))) {
+      score = 540;
+    } else {
+      const combined = `${normTitle} ${normAuthor} ${normGenre}`;
+      if (tokens.every((t) => combined.includes(t))) {
+        const titleTokenHits = tokens.filter((t) => normTitle.includes(t)).length;
+        const authorHit = normAuthor.includes(normQuery) || tokens.some((t) => normAuthor.includes(t));
+        score = 260 + titleTokenHits * 95 + (authorHit ? 80 : 0);
+      }
+    }
+
+    if (score > 0) {
+      const isCompleted = Boolean(completedItems[item.id]?.completed);
+      // Slight tie-breaker boost for unread works and tighter title lengths
+      const adjustedScore =
+        score + (isCompleted ? 0 : 4) - Math.min(25, Math.floor(normTitle.length * 0.25));
+
+      countsByCategory.all += 1;
+      if (countsByCategory[item.categoryKey] !== undefined) {
+        countsByCategory[item.categoryKey] += 1;
+      }
+
+      scored.push({
+        item,
+        score: adjustedScore,
+        idx
+      });
+    }
+  }
+
+  scored.sort((a, b) => b.score - a.score || a.idx - b.idx);
+
+  const filtered =
+    categoryKey && categoryKey !== 'all'
+      ? scored.filter((entry) => entry.item.categoryKey === categoryKey)
+      : scored;
+
+  return {
+    isQueryEmpty: false,
+    query: normQuery,
+    results: filtered.slice(0, limit).map((entry) => entry.item),
+    totalMatches: filtered.length,
+    totalAllCategories: scored.length,
+    countsByCategory
+  };
+}
+

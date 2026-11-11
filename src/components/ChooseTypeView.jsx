@@ -2,6 +2,7 @@ import React from 'react';
 import {
   ArrowLeft,
   ArrowRight,
+  Search,
   Feather,
   BookOpen,
   ScrollText,
@@ -23,7 +24,8 @@ export default function ChooseTypeView({
   streakStats,
   soundEnabled = true,
   onBackHome,
-  onSelectType
+  onSelectType,
+  onOpenSearch
 }) {
   return (
     <div className="funnel-page choose-type-page" id="choose-type-view">
@@ -49,10 +51,26 @@ export default function ChooseTypeView({
         <p className="funnel-eyebrow">Guided Exploration</p>
         <h1 className="funnel-title">What form are you in the mood for?</h1>
         <p className="funnel-lead">
-          Choose one of the four literary pillars first. On the next screen, you&rsquo;ll pick a
-          genre, era, or city.
+          Choose one of the four literary pillars first—or jump straight to a specific title.
         </p>
       </header>
+
+      {onOpenSearch && (
+        <button
+          type="button"
+          id="explore-search-trigger-btn"
+          className="explore-search-bar-btn"
+          onClick={onOpenSearch}
+        >
+          <span className="explore-search-bar-left">
+            <Search size={16} aria-hidden="true" />
+            <span>Search for a specific title, author, or place…</span>
+          </span>
+          <span className="explore-search-bar-right">
+            <span>400 titles</span>
+          </span>
+        </button>
+      )}
 
       <MascotCoachBanner
         streakStats={streakStats}
