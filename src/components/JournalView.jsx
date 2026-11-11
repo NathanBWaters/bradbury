@@ -12,9 +12,11 @@ import {
 } from 'lucide-react';
 import { MAIN_CATEGORIES } from '../utils/catalogEngine.js';
 import { MascotCoachBanner } from './FolioMascot.jsx';
+import { TrophyCase } from './RewardsWidgets.jsx';
 
 export default function JournalView({
   streakStats,
+  rewards,
   allItemsByCategory,
   completedItems,
   externalLogs,
@@ -121,6 +123,8 @@ export default function JournalView({
           </div>
         </div>
       </section>
+
+      {rewards && <TrophyCase rewards={rewards} />}
 
       {/* Four-Pillar Breakdown */}
       <section className="journal-pillars-section" aria-label="Progress by pillar">

@@ -693,3 +693,132 @@ describe('Bradbury 1000 — Title-First Catalog Search Engine', () => {
   });
 });
 
+
+describe('Rewards engine — XP, levels, daily quests, chest & achievements', async () => {
+  const {
+    computeRewards,
+    diffRewards,
+    getDailyQuestDefs,
+    levelFromXp,
+    xpForLevel,
+    formatCountdown,
+    MONTHLY_QUEST_TARGET
+  } = await import('../../src/utils/rewardsEngine.js');
+  const { addDaysToDateKey } = await import('../../src/utils/streakEngine.js');
+
+  const now = new Date(2026, 10, 11, 21, 0, 0);
+  const at = (dateKey, hour = 20) => {
+    const [y, m, d] = dateKey.split('-').map(Number);
+    return new Date(y, m - 1, d, hour, 30, 0).toISOString();
+  };
+  const read = (id, dateKey, hour) => ({
+    [id]: { completed: true, completedAt: at(dateKey, hour), categoryKey: id.split('-')[0] }
+  });
+
+  it('starts a new reader at Level 1 with 0 XP and three open quests', () => {
+    const r = computeRewards({}, [], { now });
+    assert.equal(r.totalXp, 0);
+    assert.equal(r.level, 1);
+    assert.equal(r.quests.length, 3);
+    assert.ok(r.quests.every((q) => !q.done && q.progress === 0));
+    assert.equal(r.chestOpenedToday, false);
+    assert.ok(r.msUntilReset > 0 && r.msUntilReset <= 3 * 3600 * 1000);
+    assert.ok(r.achievements.every((a) => a.level === 0));
+  });
+
+  it('deals the same three quests for a date on every device, with a form quest in the middle', () => {
+    assert.deepEqual(getDailyQuestDefs('2026-11-11'), getDailyQuestDefs('2026-11-11'));
+    const forms = new Set();
+    for (let i = 0; i < 40; i++) {
+      const defs = getDailyQuestDefs(addDaysToDateKey('2026-11-11', i));
+      assert.equal(defs[0].id, 'spark');
+      forms.add(defs[1].form);
+    }
+    assert.equal(forms.size, 4, 'form quest should rotate through all four pillars');
+  });
+
+  it('pays reading XP + first-read bonus + the spark quest for one read', () => {
+    const r = computeRewards(read('poem-1', '2026-11-11'), [], { now });
+    const spark = r.quests.find((q) => q.id === 'spark');
+    assert.equal(spark.done, true);
+    const questXp = r.quests.filter((q) => q.done).reduce((s, q) => s + q.rewardXp, 0);
+    assert.equal(r.totalXp, 10 + 5 + questXp);
+    assert.equal(r.todayXp, r.totalXp);
+  });
+
+  it('a full four-form night completes every quest, opens the chest and levels up', () => {
+    const prev = computeRewards({}, [], { now });
+    const completed = {
+      ...read('poem-1', '2026-11-11'),
+      ...read('story-1', '2026-11-11'),
+      ...read('essay-1', '2026-11-11'),
+      ...read('korea-1', '2026-11-11')
+    };
+    const next = computeRewards(completed, [], { now, longestStreak: 1, goldNights: 1 });
+    assert.equal(next.questsDoneToday, 3);
+    assert.equal(next.chestOpenedToday, true);
+    // 65 reading + 5 + 15 + 25 bonuses + 45 quests + 25 chest
+    assert.equal(next.totalXp, 180);
+    const earned = diffRewards(prev, next);
+    assert.equal(earned.xpGained, 180);
+    assert.equal(earned.questsCompleted.length, 3);
+    assert.equal(earned.chestOpened, true);
+    assert.ok(earned.levelUp && earned.levelUp.to === next.level && next.level > 1);
+    const ids = earned.achievements.map((a) => a.id);
+    assert.ok(ids.includes('bibliophile') && ids.includes('gilded') && ids.includes('quartet'));
+  });
+
+  it('un-marking a work takes its XP back and never double-pays', () => {
+    const one = computeRewards(read('story-1', '2026-11-11'), [], { now });
+    const none = computeRewards(
+      { 'story-1': { completed: false, completedAt: null, categoryKey: 'story' } },
+      [],
+      { now }
+    );
+    assert.equal(none.totalXp, 0);
+    assert.equal(diffRewards(one, none).xpGained, 0);
+  });
+
+  it('level curve is monotonic and levelFromXp inverts xpForLevel', () => {
+    for (let level = 1; level < 30; level++) {
+      assert.ok(xpForLevel(level + 1) > xpForLevel(level));
+      assert.equal(levelFromXp(xpForLevel(level)).level, level);
+      assert.equal(levelFromXp(xpForLevel(level + 1) - 1).level, level);
+    }
+    const mid = levelFromXp(70);
+    assert.equal(mid.level, 2);
+    assert.equal(mid.xpToNextLevel, 30);
+  });
+
+  it('counts external logs, night-owl hours, past days and the monthly challenge', () => {
+    let completed = {};
+    for (let i = 0; i < 11; i++) {
+      const day = addDaysToDateKey('2026-11-01', i);
+      completed = {
+        ...completed,
+        ...read(`poem-${i + 1}`, day, 23),
+        ...read(`story-${i + 1}`, day),
+        ...read(`essay-${i + 1}`, day),
+        ...read(`sf-${i + 1}`, day)
+      };
+    }
+    const logs = [{ id: 'ext-1', slotKey: 'essay', loggedAt: at('2026-10-30', 6) }];
+    const r = computeRewards(completed, logs, { now, longestStreak: 11 });
+    assert.equal(r.monthly.progress, MONTHLY_QUEST_TARGET);
+    assert.equal(r.monthly.done, true);
+    assert.equal(r.monthly.badgesEarned, 1);
+    assert.equal(r.monthly.daysLeft, 20);
+    const byId = Object.fromEntries(r.achievements.map((a) => [a.id, a]));
+    assert.equal(byId.nightowl.value, 11);
+    assert.equal(byId.earlybird.value, 1);
+    assert.equal(byId.essayist.value, 12);
+    assert.equal(byId.wayfarer.value, 11);
+    assert.equal(byId.wildfire.level, 2);
+    assert.equal(byId.quartet.value, 11);
+  });
+
+  it('formats the midnight countdown', () => {
+    assert.equal(formatCountdown(3 * 3600000 + 5 * 60000), '3h 05m');
+    assert.equal(formatCountdown(59000), '1m');
+  });
+});

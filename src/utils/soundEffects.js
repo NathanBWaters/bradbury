@@ -299,3 +299,54 @@ export function playUndoSound(enabled = true) {
   });
   return true;
 }
+
+/**
+ * 7. Quest Complete — two bright "ding-ding!" bells, delayed so it lands after the main chime.
+ */
+export function playQuestCompleteSound(enabled = true, delay = 0) {
+  if (!enabled) return false;
+  const ctx = getAudioContext();
+  if (!ctx) return false;
+  const t = ctx.currentTime + 0.01 + delay;
+  [1318.51, 1760].forEach((freq, idx) => {
+    scheduleWarmNote(ctx, {
+      freq,
+      startTime: t + idx * 0.11,
+      duration: 0.34,
+      gain: 0.12,
+      overtoneRatio: 3,
+      overtoneGain: 0.03
+    });
+  });
+  return true;
+}
+
+/**
+ * 8. Level Up — rising G-major fanfare that resolves on a held high G.
+ */
+export function playLevelUpSound(enabled = true, delay = 0) {
+  if (!enabled) return false;
+  const ctx = getAudioContext();
+  if (!ctx) return false;
+  const t = ctx.currentTime + 0.01 + delay;
+  const run = [392, 493.88, 587.33, 783.99, 987.77, 1174.66];
+  run.forEach((freq, idx) => {
+    scheduleWarmNote(ctx, {
+      freq,
+      startTime: t + idx * 0.085,
+      duration: 0.3,
+      gain: 0.13,
+      overtoneGain: 0.04
+    });
+  });
+  [783.99, 1174.66, 1567.98].forEach((freq) => {
+    scheduleWarmNote(ctx, {
+      freq,
+      startTime: t + run.length * 0.085 + 0.04,
+      duration: 0.9,
+      gain: 0.11,
+      overtoneGain: 0.03
+    });
+  });
+  return true;
+}

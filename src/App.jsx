@@ -34,13 +34,16 @@ import {
   writeProgress
 } from './utils/cloud.js';
 import { mergeProgress, progressKey } from './utils/progressMerge.js';
+import { computeRewards, diffRewards } from './utils/rewardsEngine.js';
 import {
   playStoryCompleteSound,
   playStreakExtendedSound,
   playGoldNightSound,
   playMascotChirpSound,
   playStepPopSound,
-  playUndoSound
+  playUndoSound,
+  playQuestCompleteSound,
+  playLevelUpSound
 } from './utils/soundEffects.js';
 import TopBar from './components/TopBar.jsx';
 import BottomNav from './components/BottomNav.jsx';
@@ -416,6 +419,15 @@ export default function App() {
     [allItemsByCategory, userState.completedItems, userState.externalLogs]
   );
 
+  const rewards = useMemo(
+    () =>
+      computeRewards(userState.completedItems, userState.externalLogs, {
+        longestStreak: streakStats.longestStreak,
+        goldNights: streakStats.goldNights
+      }),
+    [userState.completedItems, userState.externalLogs, streakStats]
+  );
+
   const unreadCounts = useMemo(
     () => ({
       poem: allItemsByCategory.poem.filter((i) => !userState.completedItems[i.id]?.completed)
@@ -498,6 +510,26 @@ export default function App() {
 
     setToast(null);
 
+    const now = new Date();
+    const earned = diffRewards(
+      computeRewards(prevState.completedItems, prevState.externalLogs, {
+        now,
+        longestStreak: prevStats.longestStreak,
+        goldNights: prevStats.goldNights
+      }),
+      computeRewards(nextCompletedItems, nextExternalLogs, {
+        now,
+        longestStreak: nextStats.longestStreak,
+        goldNights: nextStats.goldNights
+      })
+    );
+    // Second beat of the fanfare: level-ups outrank quest dings.
+    if (earned.levelUp) {
+      playLevelUpSound(soundOn, 0.95);
+    } else if (earned.questsCompleted.length > 0 || earned.achievements.length > 0) {
+      playQuestCompleteSound(soundOn, 0.9);
+    }
+
     if (!prevStats.completedToday && nextStats.completedToday) {
       playStreakExtendedSound(soundOn);
       setCelebration({
@@ -507,7 +539,8 @@ export default function App() {
         prevStreak: prevStats.currentStreak,
         newStreak: nextStats.currentStreak,
         todayCount: nextStats.todayCount,
-        goldNights: nextStats.goldNights
+        goldNights: nextStats.goldNights,
+        earned
       });
     } else if (prevStats.todayCount < 3 && nextStats.todayCount >= 3) {
       playGoldNightSound(soundOn);
@@ -518,7 +551,8 @@ export default function App() {
         prevStreak: prevStats.currentStreak,
         newStreak: nextStats.currentStreak,
         todayCount: nextStats.todayCount,
-        goldNights: nextStats.goldNights
+        goldNights: nextStats.goldNights,
+        earned
       });
     } else {
       playStoryCompleteSound(soundOn);
@@ -529,7 +563,8 @@ export default function App() {
         prevStreak: prevStats.currentStreak,
         newStreak: nextStats.currentStreak,
         todayCount: nextStats.todayCount,
-        goldNights: nextStats.goldNights
+        goldNights: nextStats.goldNights,
+        earned
       });
     }
     return true;
@@ -826,6 +861,7 @@ export default function App() {
       <TopBar
         currentView={activeReader ? 'reader' : currentView}
         streakStats={streakStats}
+        rewards={rewards}
         theme={userState.profile.theme}
         soundEnabled={soundEnabled}
         onToggleSound={handleToggleSound}
@@ -935,6 +971,7 @@ export default function App() {
         ) : currentView === 'journal' ? (
           <JournalView
             streakStats={streakStats}
+            rewards={rewards}
             allItemsByCategory={allItemsByCategory}
             completedItems={userState.completedItems}
             externalLogs={userState.externalLogs}
@@ -980,6 +1017,7 @@ export default function App() {
             }}
             onOpenPwaModal={() => setShowPwaModal(true)}
             onOpenJournal={() => navigateTo(journalPath())}
+            rewards={rewards}
           />
         )}
       </main>

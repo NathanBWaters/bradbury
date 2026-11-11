@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Flame,
   Award,
+  Zap,
   Snowflake,
   Search,
   PlusCircle,
@@ -18,6 +19,7 @@ import {
 export default function TopBar({
   currentView,
   streakStats,
+  rewards,
   theme,
   soundEnabled = true,
   onToggleSound,
@@ -158,6 +160,24 @@ export default function TopBar({
               <span>{streakStats.goldNights}</span>
               <span className="hide-on-mobile">Gold</span>
             </span>
+            {rewards && (
+              <>
+                <span className="ledger-pill-divider" aria-hidden="true">
+                  •
+                </span>
+                <span
+                  className="ledger-pill-part level"
+                  id="topbar-level-chip"
+                  title={`Level ${rewards.level} • ${rewards.title} — ${rewards.totalXp} XP`}
+                >
+                  <Zap size={13} fill="currentColor" />
+                  <span>
+                    <span className="hide-on-mobile">Lv </span>
+                    {rewards.level}
+                  </span>
+                </span>
+              </>
+            )}
           </button>
 
           <button

@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react';
-import { Flame, Award, Sparkles, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Flame, Award, Sparkles, X, Zap, Target, Gift, ChevronsUp, CalendarDays } from 'lucide-react';
+import { RewardIcon } from './RewardsWidgets.jsx';
 import { FolioMascot, DuolingoWeekStrip } from './FolioMascot.jsx';
 
 // Deterministic radial burst vectors so particles explode symmetrically at 60fps
@@ -23,7 +24,39 @@ const PARTICLES = [
  * Non-blocking floating stage: outer container is `pointer-events: none` so the user can
  * either admire Folio's celebration & tap "Continue" OR keep tapping cards/navigation seamlessly.
  */
+/** Counts up from 0 so the XP total visibly "pays out". */
+function XpCountUp({ value }) {
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    if (typeof requestAnimationFrame !== 'function') {
+      setShown(value);
+      return undefined;
+    }
+    let frame;
+    const start = performance.now();
+    const tick = (t) => {
+      const p = Math.min(1, (t - start) / 700);
+      setShown(Math.round(value * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+  return <>{shown}</>;
+}
+
 export default function StreakCelebrationOverlay({ celebration, streakStats, onDismiss }) {
+  const earned = celebration?.earned;
+  const unlockCount = earned
+    ? earned.questsCompleted.length +
+      earned.achievements.length +
+      (earned.chestOpened ? 1 : 0) +
+      (earned.levelUp ? 1 : 0) +
+      (earned.monthlyCompleted ? 1 : 0)
+    : 0;
+  // Give the reader longer to enjoy a bigger haul.
+  const lingerMs = 4800 + Math.min(4, unlockCount) * 900;
+
   useEffect(() => {
     if (!celebration) return undefined;
     const onKey = (e) => {
@@ -32,12 +65,12 @@ export default function StreakCelebrationOverlay({ celebration, streakStats, onD
     window.addEventListener('keydown', onKey);
     const timer = setTimeout(() => {
       onDismiss();
-    }, 4800);
+    }, lingerMs);
     return () => {
       window.removeEventListener('keydown', onKey);
       clearTimeout(timer);
     };
-  }, [celebration, onDismiss]);
+  }, [celebration, onDismiss, lingerMs]);
 
   if (!celebration) return null;
 
@@ -165,6 +198,57 @@ export default function StreakCelebrationOverlay({ celebration, streakStats, onD
             <p className="duo-celebration-sub">{subtitle}</p>
           </div>
         </div>
+
+        {earned && earned.xpGained > 0 && (
+          <div className="duo-rewards-block" id="celebration-rewards">
+            <div className="duo-xp-payout">
+              <Zap size={15} fill="currentColor" />
+              <span>
+                +<XpCountUp value={earned.xpGained} /> XP
+              </span>
+            </div>
+            {unlockCount > 0 && (
+              <ul className="duo-unlock-list">
+                {earned.levelUp && (
+                  <li className="duo-unlock level" style={{ '--i': 0 }}>
+                    <ChevronsUp size={14} />
+                    <span>
+                      Level {earned.levelUp.to} reached — <strong>{earned.levelUp.title}</strong>
+                    </span>
+                  </li>
+                )}
+                {earned.questsCompleted.map((q, idx) => (
+                  <li key={q.id} className="duo-unlock quest" style={{ '--i': idx + 1 }}>
+                    <Target size={14} />
+                    <span>Quest complete: {q.title}</span>
+                    <em>+{q.rewardXp}</em>
+                  </li>
+                ))}
+                {earned.chestOpened && (
+                  <li className="duo-unlock chest" style={{ '--i': 4 }}>
+                    <Gift size={14} />
+                    <span>Lantern Chest opened!</span>
+                    <em>bonus XP</em>
+                  </li>
+                )}
+                {earned.achievements.map((a, idx) => (
+                  <li key={a.id} className="duo-unlock achievement" style={{ '--i': idx + 5 }}>
+                    <RewardIcon name={a.icon} size={14} />
+                    <span>
+                      Achievement: <strong>{a.name}</strong> Lv {a.level}
+                    </span>
+                  </li>
+                ))}
+                {earned.monthlyCompleted && (
+                  <li className="duo-unlock achievement" style={{ '--i': 8 }}>
+                    <CalendarDays size={14} />
+                    <span>Monthly challenge badge earned!</span>
+                  </li>
+                )}
+              </ul>
+            )}
+          </div>
+        )}
 
         {(isStreakIgnition || isGoldNight) && streakStats?.weekDays && (
           <div className="duo-celebration-week">

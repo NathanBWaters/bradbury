@@ -14,6 +14,7 @@ import {
 import { MAIN_CATEGORIES } from '../utils/catalogEngine.js';
 import { FolioMascot, DuolingoWeekStrip } from './FolioMascot.jsx';
 import { playMascotChirpSound } from '../utils/soundEffects.js';
+import { DailyQuestsCard } from './RewardsWidgets.jsx';
 
 const HERO_QUIPS = [
   '“Stuff your eyes with wonder!” Tap either path below to spark tonight’s lantern.',
@@ -33,7 +34,8 @@ export default function HomeFunnelView({
   onDownloadUnreadBundle,
   onOpenExternalModal,
   onOpenPwaModal,
-  onOpenJournal
+  onOpenJournal,
+  rewards
 }) {
   const [quipIndex, setQuipIndex] = useState(-1);
   const [mascotHop, setMascotHop] = useState(false);
@@ -285,6 +287,8 @@ export default function HomeFunnelView({
         <DuolingoWeekStrip weekDays={weekDays} />
       </section>
 
+      {rewards && <DailyQuestsCard rewards={rewards} streakStats={streakStats} />}
+
       {/* Quiet Nightly Ledger Summary & Secondary Utilities */}
       <section className="home-ledger-strip" aria-label="Reading progress summary">
         <div className="home-ledger-header">
@@ -296,7 +300,7 @@ export default function HomeFunnelView({
             onClick={onOpenJournal}
           >
             <span>
-              {streakStats.totalCompleted} Read • {streakStats.goldNights} Gold • View Ledger →
+              {streakStats.totalCompleted} Read • {streakStats.goldNights} Gold • Trophies →
             </span>
           </button>
         </div>

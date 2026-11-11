@@ -36,6 +36,12 @@ Inspired by Ray Bradbury's famous lecture on creativity — **1 Poem, 1 Short St
    - **Tier 2 ("Gold Bradbury Night")**: Complete **3 of 4** pillars to advance your 1,000 Nights counter and earn **Streak Freeze** tokens (1 token every 7 Gold Nights, max 2 held).
    - **Tier 3 ("Diamond Quartet")**: Complete **all 4 of 4** pillars (Poem, Short Story, Essay, and Korea/SF Lore).
 
+7. **XP, Daily Quests & Trophy Case (`src/utils/rewardsEngine.js`)**:
+   - **XP & Levels**: every read pays XP (poem 10, essay 15, story/chronicle 20) plus first-read, Gold Night and four-form bonuses, climbing literary ranks from *Candle Lighter* to *Bradbury Laureate*.
+   - **Daily Quests + Lantern Chest**: three quests dealt per calendar day (same on every device); finishing all three opens a bonus-XP chest. A midnight countdown shows how long is left to save the streak.
+   - **Monthly Lantern Challenge** (30 quests in a month) and **12 tiered achievements** in the Ledger.
+   - All rewards are derived from synced reading history, so nothing extra is stored and un-marking a work returns its XP.
+
 ## Running Locally & Testing
 
 ```bash
