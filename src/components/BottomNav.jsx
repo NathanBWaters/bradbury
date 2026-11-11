@@ -1,57 +1,73 @@
 import React from 'react';
-import { Feather, BookOpen, ScrollText, Compass, Download } from 'lucide-react';
-
-const NAV_ITEMS = [
-  { key: 'poem', label: 'Poems', icon: Feather },
-  { key: 'story', label: 'Stories', icon: BookOpen },
-  { key: 'essay', label: 'Essays', icon: ScrollText },
-  { key: 'personal', label: 'Korea & SF', icon: Compass }
-];
+import { Home, Sparkles, Compass, BookMarked } from 'lucide-react';
 
 export default function BottomNav({
-  selectedCategory,
-  activeReader,
-  unreadCounts,
-  onSelectCategory,
-  onDownloadUnreadBundle
+  currentView,
+  totalCompleted,
+  onNavigateHome,
+  onNavigateTonight,
+  onNavigateExplore,
+  onNavigateJournal
 }) {
+  const isExplore =
+    currentView === 'choose-type' ||
+    currentView === 'choose-genre' ||
+    currentView === 'shelf';
+
+  const items = [
+    {
+      id: 'home',
+      label: 'Ritual',
+      icon: Home,
+      active: currentView === 'home',
+      onClick: onNavigateHome
+    },
+    {
+      id: 'tonight',
+      label: 'For You',
+      icon: Sparkles,
+      active: currentView === 'tonight',
+      onClick: onNavigateTonight
+    },
+    {
+      id: 'explore',
+      label: 'Explore',
+      icon: Compass,
+      active: isExplore,
+      onClick: onNavigateExplore
+    },
+    {
+      id: 'journal',
+      label: 'Ledger',
+      icon: BookMarked,
+      active: currentView === 'journal',
+      badge: totalCompleted > 0 ? totalCompleted : null,
+      onClick: onNavigateJournal
+    }
+  ];
+
   return (
     <nav className="mobile-bottom-nav" aria-label="Primary Mobile Navigation">
-      {NAV_ITEMS.map((item) => {
+      {items.map((item) => {
         const Icon = item.icon;
-        const isActive = !activeReader && selectedCategory === item.key;
-        const count = unreadCounts[item.key] ?? 0;
-
         return (
           <button
-            key={item.key}
+            key={item.id}
             type="button"
-            id={`bottom-nav-${item.key}`}
-            className={`bottom-nav-item ${isActive ? 'active' : ''}`}
-            onClick={() => onSelectCategory(item.key)}
-            aria-current={isActive ? 'page' : undefined}
+            id={`bottom-nav-${item.id}`}
+            className={`bottom-nav-item ${item.active ? 'active' : ''}`}
+            onClick={item.onClick}
+            aria-current={item.active ? 'page' : undefined}
           >
             <div className="bottom-nav-icon-wrap">
-              <Icon size={19} strokeWidth={isActive ? 2.3 : 1.8} />
-              {count > 0 && <span className="bottom-nav-badge">{count}</span>}
+              <Icon size={19} strokeWidth={item.active ? 2.3 : 1.75} />
+              {item.badge ? <span className="bottom-nav-badge">{item.badge}</span> : null}
             </div>
             <span className="bottom-nav-label">{item.label}</span>
           </button>
         );
       })}
-
-      <button
-        type="button"
-        id="bottom-nav-epub-bundle"
-        className="bottom-nav-item accent-bundle"
-        onClick={onDownloadUnreadBundle}
-        title="Download Tonight's Unread Quartet (.epub)"
-      >
-        <div className="bottom-nav-icon-wrap">
-          <Download size={19} strokeWidth={2} />
-        </div>
-        <span className="bottom-nav-label">Night .EPUB</span>
-      </button>
     </nav>
   );
 }
+

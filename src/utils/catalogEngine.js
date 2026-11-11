@@ -3,33 +3,108 @@
  * computing genre subcategories with counts, filtering unread vs. completed items,
  * and calculating 2-tier Duolingo streak statistics.
  */
+import { computeDuolingoStreak } from './streakEngine.js';
 
 export const MAIN_CATEGORIES = [
   {
     key: 'poem',
     label: 'Poem',
+    pluralLabel: 'Poems',
     shortLabel: 'Poems',
-    subtitle: 'Verbatim Verse + Deep-Dive Analysis'
+    subtitle: 'Verbatim Verse + Deep-Dive Analysis',
+    description:
+      'Lyric odes, sonnets, elegies, and modernist verse paired with a six-part critical companion.',
+    typicalDuration: '~11 min'
   },
   {
     key: 'story',
     label: 'Short Story',
+    pluralLabel: 'Short Stories',
     shortLabel: 'Stories',
-    subtitle: 'Canonical Fiction + Deep-Dive Analysis'
+    subtitle: 'Canonical Fiction + Deep-Dive Analysis',
+    description:
+      'Unabridged stories of realism, speculative worlds, wit, and gothic suspense with deep analysis.',
+    typicalDuration: '15–25 min'
   },
   {
     key: 'essay',
     label: 'Essay',
+    pluralLabel: 'Essays',
     shortLabel: 'Essays',
-    subtitle: 'Classical Essays + Deep-Dive Analysis'
+    subtitle: 'Classical Essays + Deep-Dive Analysis',
+    description:
+      'Stoic letters, nature walks, cultural criticism, and philosophical inquiries across centuries.',
+    typicalDuration: '15–20 min'
   },
   {
     key: 'personal',
     label: 'Personal (Korea & SF)',
+    pluralLabel: 'Korea & San Francisco Chronicles',
     shortLabel: 'Korea & SF',
-    subtitle: 'Korea & SF Lore + Primary Sources'
+    subtitle: 'Korea & SF Lore + Primary Sources',
+    description:
+      'Twenty-minute archival narratives exploring the hidden history, craft, and ecology of Korea and San Francisco.',
+    typicalDuration: '20 min'
   }
 ];
+
+const ESSAY_GENRE_CANONICAL_MAP = {
+  'Aphoristic Moral & Intellectual Essay': 'Stoic & Moral Philosophy',
+  'Stoic Moral Epistle & Treatise': 'Stoic & Moral Philosophy',
+  'Transcendentalist Philosophical Essay': 'Transcendentalism & Nature',
+  'Lyrical Nature & Philosophical Essay': 'Transcendentalism & Nature',
+  'Popular Science & Evolutionary Essay': 'Transcendentalism & Nature',
+  'Personal & Psychological Essay': 'Travel & Personal Essay',
+  'Humorous & Philosophical Familiar Essay': 'Travel & Personal Essay',
+  'Autobiographical Reverie / Familiar Essay': 'Travel & Personal Essay',
+  'Romantic Personal & Travel Essay': 'Travel & Personal Essay',
+  'Psychological & Philosophical Treatise': 'Philosophy & Epistemology',
+  'Philosophical Treatise': 'Philosophy & Epistemology',
+  'Literary Critical Essay': 'Cultural & Literary Criticism',
+  'Literary Craft & Aesthetic Treatise': 'Cultural & Literary Criticism',
+  'Parodic & Satirical Moral Essay': 'Social & Political Philosophy'
+};
+
+export const PERSONAL_THEMES = [
+  'Architecture & Urban Design',
+  'Craft, Food & Innovation',
+  'Arts, Literature & Culture',
+  'Nature, Ecology & Science',
+  'History, Maritime & Civic Life'
+];
+
+export function classifyPersonalTheme(item) {
+  const hay = `${item?.category || ''} ${item?.title || ''}`.toLowerCase();
+  if (
+    /(gastronom|food|culinar|tea|gimjang|onggi|yeast|market|paper|metalwork|tavern|celadon|ceramic|string craft|horolog|electronic|cybernetic|computing|cable car|invent)/.test(
+      hay
+    )
+  ) {
+    return 'Craft, Food & Innovation';
+  }
+  if (
+    /(literar|poet|cinema|pansori|jazz|mural|fresco|media art|woodblock|jikji|hangul|bohemia|counterculture|botanical painting|satire|chess)/.test(
+      hay
+    )
+  ) {
+    return 'Arts, Literature & Culture';
+  }
+  if (
+    /(maritime|admiral|turtle ship|ghost fleet|alcatraz|angel island|immigra|civil rights|harvey milk|emperor norton|labor|diplomacy|epidemiolog|public health|royal archives|dynasty|quake|wartime|military)/.test(
+      hay
+    )
+  ) {
+    return 'History, Maritime & Civic Life';
+  }
+  if (
+    /(ecolog|geolog|fog|volcan|haenyeo|forest|stream|cheonggyecheon|astronom|meteorol|climate|marine|rewild|dune|lighthouse|garden)/.test(
+      hay
+    )
+  ) {
+    return 'Nature, Ecology & Science';
+  }
+  return 'Architecture & Urban Design';
+}
 
 export function buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces) {
   const poems = (poemsAndEssays?.poems || []).map((p, idx) => ({
@@ -52,20 +127,30 @@ export function buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces) {
     subcategory: s.genre || s.era || 'Literary Fiction'
   }));
 
-  const essays = (poemsAndEssays?.essays || []).map((e, idx) => ({
-    ...e,
-    keyContext: e.keyContext || e.analysis?.[0]?.paragraph || '',
-    categoryKey: 'essay',
-    slotLabel: 'Essay',
-    nightNumber: e.night || idx + 1,
-    staticUrl: `/read/day-${e.night || idx + 1}/essay`,
-    subcategory: e.genre || e.era || 'Classical Essay'
-  }));
+  const essays = (poemsAndEssays?.essays || []).map((e, idx) => {
+    const rawGenre = e.genre || e.era || 'Classical Essay';
+    const canonicalGenre = ESSAY_GENRE_CANONICAL_MAP[rawGenre] || rawGenre;
+    return {
+      ...e,
+      rawGenre,
+      genre: canonicalGenre,
+      keyContext: e.keyContext || e.analysis?.[0]?.paragraph || '',
+      categoryKey: 'essay',
+      slotLabel: 'Essay',
+      nightNumber: e.night || idx + 1,
+      staticUrl: `/read/day-${e.night || idx + 1}/essay`,
+      subcategory: canonicalGenre
+    };
+  });
 
   const korea = (storiesAndPlaces?.koreaStories || []).map((k, idx) => {
     const metrics = computeStoryAudioMetrics(k);
+    const themeGroup = classifyPersonalTheme(k);
+    const resolvedCategory = k.category || themeGroup;
     return {
       ...k,
+      category: resolvedCategory,
+      themeGroup,
       keyContext: k.keyContext || k.analysis?.[0]?.paragraph || '',
       wordCount: k.wordCount || metrics.totalWords,
       audioDurationMinutes: k.audioDurationMinutes || metrics.estimatedAudioMinutes,
@@ -73,15 +158,19 @@ export function buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces) {
       slotLabel: 'Korea Deep-Dive',
       nightNumber: k.night || idx + 1,
       staticUrl: `/read/day-${k.night || idx + 1}/korea`,
-      subcategory: `Korea • ${k.category || 'History & Culture'}`,
+      subcategory: `Korea • ${resolvedCategory}`,
       regionGroup: 'Korea'
     };
   });
 
   const sf = (storiesAndPlaces?.sfStories || []).map((s, idx) => {
     const metrics = computeStoryAudioMetrics(s);
+    const themeGroup = classifyPersonalTheme(s);
+    const resolvedCategory = s.category || themeGroup;
     return {
       ...s,
+      category: resolvedCategory,
+      themeGroup,
       keyContext: s.keyContext || s.analysis?.[0]?.paragraph || '',
       wordCount: s.wordCount || metrics.totalWords,
       audioDurationMinutes: s.audioDurationMinutes || metrics.estimatedAudioMinutes,
@@ -89,12 +178,12 @@ export function buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces) {
       slotLabel: 'San Francisco Deep-Dive',
       nightNumber: s.night || idx + 1,
       staticUrl: `/read/day-${s.night || idx + 1}/sf`,
-      subcategory: `San Francisco • ${s.category || 'History & Culture'}`,
+      subcategory: `San Francisco • ${resolvedCategory}`,
       regionGroup: 'San Francisco'
     };
   });
 
-  // Interleave Korea and SF 1..10 equally
+  // Interleave Korea and SF 1..50 equally
   const personal = [];
   const maxLen = Math.max(korea.length, sf.length);
   for (let i = 0; i < maxLen; i++) {
@@ -110,34 +199,91 @@ export function buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces) {
   };
 }
 
-export function getSubcategoriesForCategory(allItemsByCategory, selectedCategory) {
+function summarizeGroupItems(groupItems, completedItems = {}) {
+  const unreadCount = groupItems.filter((x) => !completedItems[x.id]?.completed).length;
+  const voices = [];
+  const seenVoices = new Set();
+  for (const item of groupItems) {
+    const cleanAuthor = item.author
+      ? item.author.replace(/\s*\([^)]*\)/g, '').trim()
+      : '';
+    const cleanLocation = item.location
+      ? item.location.replace(/\s*\([^)]*\)/g, '').split(',')[0].trim()
+      : '';
+    const rawVoice = cleanAuthor
+      ? cleanAuthor.split(/\s+/).slice(-1)[0]
+      : cleanLocation;
+    if (rawVoice && !seenVoices.has(rawVoice)) {
+      seenVoices.add(rawVoice);
+      voices.push(rawVoice);
+    }
+    if (voices.length >= 3) break;
+  }
+  return {
+    count: groupItems.length,
+    unreadCount,
+    sampleVoices: voices.join(' · ')
+  };
+}
+
+export function getSubcategoriesForCategory(
+  allItemsByCategory,
+  selectedCategory,
+  completedItems = {}
+) {
   const items = allItemsByCategory[selectedCategory] || [];
   if (selectedCategory === 'personal') {
-    const koreaCount = items.filter((i) => i.region === 'Korea').length;
-    const sfCount = items.filter((i) => i.region === 'San Francisco').length;
+    const koreaItems = items.filter((i) => i.region === 'Korea');
+    const sfItems = items.filter((i) => i.region === 'San Francisco');
+    const allStats = summarizeGroupItems(items, completedItems);
+    const koreaStats = summarizeGroupItems(koreaItems, completedItems);
+    const sfStats = summarizeGroupItems(sfItems, completedItems);
+
     const list = [
-      { id: 'All', label: 'All', count: items.length },
-      { id: 'Korea', label: '🇰🇷 Korea', count: koreaCount },
-      { id: 'San Francisco', label: '🌉 San Francisco', count: sfCount }
+      { id: 'All', label: 'All Chronicles', kind: 'all', ...allStats },
+      {
+        id: 'Korea',
+        label: 'Korea',
+        kind: 'region',
+        blurb: 'Royal observatories, Jeju basalt coasts, celadon kilns, and Seoul urbanism.',
+        ...koreaStats
+      },
+      {
+        id: 'San Francisco',
+        label: 'San Francisco',
+        kind: 'region',
+        blurb: 'Buried Gold Rush ships, Beat poetry, fog physics, and bayfront engineering.',
+        ...sfStats
+      }
     ];
-    const seen = new Set(['All', 'Korea', 'San Francisco']);
-    items.forEach((item) => {
-      if (item.category && !seen.has(item.category)) {
-        seen.add(item.category);
-        const count = items.filter((x) => x.category === item.category).length;
-        list.push({ id: item.category, label: item.category, count });
+
+    PERSONAL_THEMES.forEach((theme) => {
+      const themeItems = items.filter((x) => x.themeGroup === theme);
+      if (themeItems.length > 0) {
+        list.push({
+          id: theme,
+          label: theme,
+          kind: 'theme',
+          ...summarizeGroupItems(themeItems, completedItems)
+        });
       }
     });
     return list;
   }
 
-  const list = [{ id: 'All', label: 'All Genres', count: items.length }];
+  const allStats = summarizeGroupItems(items, completedItems);
+  const list = [{ id: 'All', label: 'All Genres', kind: 'all', ...allStats }];
   const seen = new Set(['All']);
   items.forEach((item) => {
     if (item.genre && !seen.has(item.genre)) {
       seen.add(item.genre);
-      const count = items.filter((x) => x.genre === item.genre).length;
-      list.push({ id: item.genre, label: item.genre, count });
+      const genreItems = items.filter((x) => x.genre === item.genre);
+      list.push({
+        id: item.genre,
+        label: item.genre,
+        kind: 'genre',
+        ...summarizeGroupItems(genreItems, completedItems)
+      });
     }
   });
   return list;
@@ -162,9 +308,9 @@ export function filterAndPartitionItems(
       ) {
         return item.region === 'San Francisco';
       }
-      return item.category === selectedSubcategory;
+      return item.themeGroup === selectedSubcategory || item.category === selectedSubcategory;
     }
-    return item.genre === selectedSubcategory;
+    return item.genre === selectedSubcategory || item.rawGenre === selectedSubcategory;
   });
 
   const unreadItems = [];
@@ -181,7 +327,12 @@ export function filterAndPartitionItems(
   return { unreadItems, completedCategoryItems };
 }
 
-export function computeStreakStats(allItemsByCategory, completedItems = {}, externalLogs = []) {
+export function computeStreakStats(
+  allItemsByCategory,
+  completedItems = {},
+  externalLogs = [],
+  options = {}
+) {
   const poemsDone = (allItemsByCategory.poem || []).filter(
     (i) => completedItems[i.id]?.completed
   ).length;
@@ -204,10 +355,10 @@ export function computeStreakStats(allItemsByCategory, completedItems = {}, exte
     personalDone > 0
   ].filter(Boolean).length;
 
-  const goldNights = Math.floor(totalCompleted / 3);
-  const freezeTokens = Math.min(2, 1 + Math.floor(goldNights / 7));
-  const litFlameStreak = totalCompleted > 0 ? Math.max(1, totalCompleted) : 1;
-  const nextGoldProgress = totalCompleted % 3;
+  const duo = computeDuolingoStreak(completedItems, externalLogs, options);
+  const goldNights = Math.max(duo.totalGoldDays, Math.floor(totalCompleted / 3));
+  const nextGoldProgress =
+    duo.todayCount > 0 ? duo.todayCount % 3 : totalCompleted % 3;
 
   return {
     poemsDone,
@@ -217,9 +368,24 @@ export function computeStreakStats(allItemsByCategory, completedItems = {}, exte
     totalCompleted,
     categoriesTouched,
     goldNights,
-    freezeTokens,
-    maxFreezeTokens: 2,
-    litFlameStreak,
+    freezeTokens: duo.freezeTokens,
+    maxFreezeTokens: duo.maxFreezeTokens,
+    litFlameStreak: duo.currentStreak,
+    currentStreak: duo.currentStreak,
+    longestStreak: duo.longestStreak,
+    completedToday: duo.completedToday,
+    todayCount: duo.todayCount,
+    todayCategories: duo.todayCategories,
+    todayGoldUnlocked: duo.todayGoldUnlocked,
+    todayPerfectQuartet: duo.todayPerfectQuartet,
+    streakState: duo.streakState,
+    frozeYesterday: duo.frozeYesterday,
+    frozenDates: duo.frozenDates,
+    lastBrokenStreak: duo.lastBrokenStreak,
+    totalActiveDays: duo.totalActiveDays,
+    weekDays: duo.weekDays,
+    nextMilestone: duo.nextMilestone,
+    daysToNextFreeze: duo.daysToNextFreeze,
     nextGoldProgress
   };
 }
@@ -333,3 +499,84 @@ export function markItemCompletedState(
   };
 }
 
+function computeDaySeed(dateKey) {
+  const str = dateKey || new Date().toISOString().slice(0, 10);
+  let hash = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash >>> 0);
+}
+
+/**
+ * Deals one curated unread work from each of the 4 pillars for Tonight's Quartet.
+ * Supports either a global numeric shuffleOffset or per-category offsets { poem, story, essay, personal }.
+ */
+export function dealTonightQuartet(
+  allItemsByCategory,
+  completedItems = {},
+  shuffleOffsets = 0,
+  dateKey = null
+) {
+  const daySeed = computeDaySeed(dateKey);
+  const recommended = getNextRecommendedPillar(allItemsByCategory, completedItems);
+
+  return MAIN_CATEGORIES.map((cat, catIdx) => {
+    const allInCat = allItemsByCategory[cat.key] || [];
+    const unread = allInCat.filter((i) => !completedItems[i.id]?.completed);
+    const pool = unread.length > 0 ? unread : allInCat;
+    const catOffset =
+      typeof shuffleOffsets === 'number'
+        ? shuffleOffsets
+        : Number(shuffleOffsets?.[cat.key] || 0);
+
+    const pickIdx =
+      pool.length > 0 ? (daySeed + catIdx * 17 + catOffset) % pool.length : 0;
+    const item = pool[pickIdx] || null;
+
+    return {
+      categoryKey: cat.key,
+      categoryLabel: cat.label,
+      shortLabel: cat.shortLabel,
+      typicalDuration: cat.typicalDuration,
+      unreadRemaining: unread.length,
+      allCompletedInPillar: unread.length === 0 && allInCat.length > 0,
+      isRecommendedNext: recommended?.categoryKey === cat.key,
+      item
+    };
+  }).filter((entry) => entry.item);
+}
+
+/**
+ * Picks a single unread work for 1-tap "Surprise Me" reading.
+ */
+export function pickSurpriseItem(
+  allItemsByCategory,
+  completedItems = {},
+  { categoryKey = null, subcategory = 'All', randomValue = Math.random() } = {}
+) {
+  let pool = [];
+  if (categoryKey) {
+    const { unreadItems } = filterAndPartitionItems(
+      allItemsByCategory,
+      categoryKey,
+      subcategory,
+      completedItems
+    );
+    pool = unreadItems.length > 0 ? unreadItems : allItemsByCategory[categoryKey] || [];
+  } else {
+    for (const cat of MAIN_CATEGORIES) {
+      const items = allItemsByCategory[cat.key] || [];
+      pool.push(...items.filter((i) => !completedItems[i.id]?.completed));
+    }
+    if (pool.length === 0) {
+      for (const cat of MAIN_CATEGORIES) {
+        pool.push(...(allItemsByCategory[cat.key] || []));
+      }
+    }
+  }
+  if (pool.length === 0) return null;
+  const idx = Math.min(pool.length - 1, Math.max(0, Math.floor(randomValue * pool.length)));
+  return pool[idx];
+}

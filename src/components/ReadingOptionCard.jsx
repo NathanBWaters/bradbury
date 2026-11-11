@@ -1,9 +1,8 @@
 import React from 'react';
 import {
   Clock,
-  MapPin,
   BookOpen,
-  Share2,
+  Headphones,
   Download,
   CheckCircle2,
   Circle
@@ -22,7 +21,21 @@ export default function ReadingOptionCard({
 
   const isKorea = item.region === 'Korea';
   const isSF = item.region === 'San Francisco';
-  const genreOrCategory = item.genre || item.category;
+  const filterTarget = isKorea
+    ? 'Korea'
+    : isSF
+    ? 'San Francisco'
+    : item.genre || item.category;
+
+  const badgeLabel = isKorea
+    ? `Korea • ${item.themeGroup || item.category}`
+    : isSF
+    ? `San Francisco • ${item.themeGroup || item.category}`
+    : item.genre || item.category;
+
+  const previewText =
+    item.epigraph ||
+    (item.keyContext ? `${item.keyContext.split('. ').slice(0, 2).join('. ')}.` : '');
 
   return (
     <article
@@ -34,63 +47,44 @@ export default function ReadingOptionCard({
           <button
             type="button"
             className={`slot-badge ${isKorea ? 'korea' : isSF ? 'sf' : ''}`}
-            onClick={() => onSelectGenre && onSelectGenre(genreOrCategory)}
-            title="Filter by this genre"
+            onClick={() => onSelectGenre && onSelectGenre(filterTarget)}
+            title={`Filter by ${filterTarget}`}
           >
-            {isKorea
-              ? `🇰🇷 Korea • ${item.category}`
-              : isSF
-              ? `🌉 SF • ${item.category}`
-              : genreOrCategory}
+            {badgeLabel}
           </button>
 
           <div className="slot-meta-row">
             <Clock size={12} />
-            <span>{item.readingTimeMinutes}m</span>
-            {item.wordCount ? <span>• {item.wordCount.toLocaleString()}w</span> : null}
-            {item.lineCount ? <span>• {item.lineCount}L</span> : null}
+            <span>{item.readingTimeMinutes} min</span>
           </div>
         </div>
 
-        <h3
-          className={`slot-title ${completed ? 'strikethrough' : ''}`}
+        <button
+          type="button"
+          className="slot-card-open-area"
           onClick={onOpenReader}
+          aria-label={`Read ${item.title}`}
         >
-          {item.title}
-        </h3>
+          <h3 className={`slot-title ${completed ? 'strikethrough' : ''}`}>
+            {item.title}
+          </h3>
 
-        <p className="slot-author">
-          {item.author ? (
-            <>
-              {item.author} • {item.year} ({item.era})
-            </>
-          ) : (
-            <>
-              {item.subtitle} • {item.era}
-            </>
-          )}
-        </p>
+          <p className="slot-author">
+            {item.author ? (
+              <>
+                {item.author}
+                {item.year ? ` · ${item.year}` : ''}
+              </>
+            ) : (
+              <>
+                {item.location || item.subtitle}
+                {item.era ? ` · ${item.era}` : ''}
+              </>
+            )}
+          </p>
 
-        {item.epigraph && <p className="slot-epigraph">{item.epigraph}</p>}
-
-        <div className="slot-tags">
-          {item.author ? (
-            <span className="slot-tag">Verbatim Unabridged</span>
-          ) : (
-            item.location && (
-              <span className="slot-tag location-tag">
-                <MapPin size={11} />
-                {item.location}
-              </span>
-            )
-          )}
-          <span className="slot-tag">
-            +Key Context &amp; Analysis
-          </span>
-          {Array.isArray(item.sources) && item.sources.length > 0 && (
-            <span className="slot-tag sources-tag">{item.sources.length} Sources Cited</span>
-          )}
-        </div>
+          {previewText && <p className="slot-epigraph">{previewText}</p>}
+        </button>
       </div>
 
       <div className="slot-footer">
@@ -108,20 +102,21 @@ export default function ReadingOptionCard({
             type="button"
             className="icon-btn card-eleven-btn"
             onClick={onShareElevenReader}
-            title="Share full unabridged text, key context & analysis to ElevenReader"
+            title="Listen in ElevenReader (shares full text + analysis & marks read)"
           >
-            <Share2 size={14} />
-            <span>ElevenReader</span>
+            <Headphones size={14} />
+            <span>Listen</span>
           </button>
 
           <button
             type="button"
             className="icon-btn card-epub-btn"
             onClick={onDownloadEpub}
-            title="Download .epub with analysis for ElevenReader"
+            title="Download .epub with analysis"
+            aria-label={`Download ${item.title} as EPUB`}
           >
             <Download size={14} />
-            <span>.epub</span>
+            <span className="epub-btn-text">.epub</span>
           </button>
         </div>
 
@@ -130,6 +125,7 @@ export default function ReadingOptionCard({
           className={`check-btn ${completed ? 'done' : ''}`}
           onClick={onToggleComplete}
           aria-pressed={completed}
+          aria-label={completed ? `Unmark ${item.title} as read` : `Mark ${item.title} as read`}
         >
           {completed ? (
             <>
@@ -147,3 +143,4 @@ export default function ReadingOptionCard({
     </article>
   );
 }
+

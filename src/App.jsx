@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
 import { Sparkles } from 'lucide-react';
 import poemsAndEssays from './data/poemsAndEssays.json';
 import storiesAndPlaces from './data/storiesAndPlaces.json';
@@ -10,10 +10,21 @@ import {
   filterAndPartitionItems,
   computeStreakStats,
   getNextRecommendedPillar,
-  markItemCompletedState
+  markItemCompletedState,
+  dealTonightQuartet,
+  pickSurpriseItem
 } from './utils/catalogEngine.js';
 import { formatFullPlainTextForElevenReader } from './utils/plainTextFormatter.js';
-import { parseLocation, categoryPath, itemPath } from './utils/router.js';
+import {
+  parseLocation,
+  homePath,
+  tonightPath,
+  chooseTypePath,
+  chooseGenrePath,
+  shelfPath,
+  itemPath,
+  journalPath
+} from './utils/router.js';
 import {
   onUserChange,
   signInWithGoogle,
@@ -23,12 +34,24 @@ import {
   writeProgress
 } from './utils/cloud.js';
 import { mergeProgress, progressKey } from './utils/progressMerge.js';
+import {
+  playStoryCompleteSound,
+  playStreakExtendedSound,
+  playGoldNightSound,
+  playMascotChirpSound,
+  playStepPopSound,
+  playUndoSound
+} from './utils/soundEffects.js';
 import TopBar from './components/TopBar.jsx';
 import BottomNav from './components/BottomNav.jsx';
-import CategoryDeck from './components/CategoryDeck.jsx';
-import ReadingOptionCard from './components/ReadingOptionCard.jsx';
+import HomeFunnelView from './components/HomeFunnelView.jsx';
+import TonightQuartetView from './components/TonightQuartetView.jsx';
+import ChooseTypeView from './components/ChooseTypeView.jsx';
+import ChooseGenreView from './components/ChooseGenreView.jsx';
+import ShelfView from './components/ShelfView.jsx';
+import JournalView from './components/JournalView.jsx';
 import ReaderView from './components/ReaderView.jsx';
-import StreakCelebrationBanner from './components/StreakCelebrationBanner.jsx';
+import StreakCelebrationOverlay from './components/StreakCelebrationOverlay.jsx';
 import {
   ExternalBookModal,
   ProfileSettingsModal,
@@ -49,7 +72,8 @@ const DEFAULT_USER_STATE = {
     includeAnalysisInEpub: true,
     theme: 'parchment',
     readerFontScale: 100,
-    readerLineHeight: 'relaxed'
+    readerLineHeight: 'relaxed',
+    soundEnabled: true
   },
   completedItems: {},
   externalLogs: []
@@ -103,30 +127,57 @@ export default function App() {
     () => buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces),
     []
   );
-  const initialRoute = useMemo(() => parseLocation(window.location, allItemsByCategory), [allItemsByCategory]);
+  const initialRoute = useMemo(
+    () => parseLocation(window.location, allItemsByCategory),
+    [allItemsByCategory]
+  );
+
+  const [currentView, setCurrentView] = useState(initialRoute.view);
   const [selectedCategory, setSelectedCategory] = useState(initialRoute.categoryKey);
-  const [selectedSubcategory, setSelectedSubcategory] = useState('All');
+  const [selectedSubcategory, setSelectedSubcategory] = useState(
+    initialRoute.subcategory || 'All'
+  );
   const [activeReader, setActiveReader] = useState(() =>
     initialRoute.item ? readerFor(initialRoute.item) : null
   );
+
+  // Deal 4 curated unread items for Tonight's Quartet and keep their IDs stable
+  // during the session unless the user explicitly taps Shuffle or Swap.
+  const [quartetOffsets, setQuartetOffsets] = useState({
+    poem: 0,
+    story: 0,
+    essay: 0,
+    personal: 0
+  });
+  const [lockedQuartetIds, setLockedQuartetIds] = useState(() => {
+    const initialDeal = dealTonightQuartet(allItemsByCategory, userState.completedItems, 0);
+    return Object.fromEntries(initialDeal.map((entry) => [entry.categoryKey, entry.item.id]));
+  });
+
   const [showExternalModal, setShowExternalModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showPwaModal, setShowPwaModal] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [toast, setToast] = useState(null);
-  // undefined = Firebase still restoring the session; null = signed out.
+  const [celebration, setCelebration] = useState(null);
   const [authUser, setAuthUser] = useState(undefined);
   const [syncStatus, setSyncStatus] = useState('idle');
   const userStateRef = useRef(userState);
   userStateRef.current = userState;
   const lastSyncedKey = useRef(null);
 
-  const showToastMessage = (msg) => {
+  const soundEnabled = userState.profile.soundEnabled !== false;
+
+  const showToastMessage = useCallback((msg) => {
     setToast(msg);
     setTimeout(() => {
       setToast((prev) => (prev === msg ? null : prev));
-    }, 4000);
-  };
+    }, 3800);
+  }, []);
+
+  const dismissCelebration = useCallback(() => {
+    setCelebration(null);
+  }, []);
 
   useEffect(() => {
     const theme = userState.profile.theme || 'parchment';
@@ -163,8 +214,6 @@ export default function App() {
       uid,
       (remote) => {
         const local = syncablePart(userStateRef.current);
-        // First sync on this device: combine what's here with the account so
-        // nothing read on either side is lost. Later: account wins for prefs.
         const merged = remote
           ? mergeProgress(local, remote, { preferRemotePrefs: true })
           : local;
@@ -188,9 +237,8 @@ export default function App() {
       }
     );
     return unsubscribe;
-  }, [authUser?.uid]);
+  }, [authUser?.uid, showToastMessage]);
 
-  // Push local changes (marking a work read, logging a book, prefs) to the account.
   useEffect(() => {
     if (!authUser || lastSyncedKey.current === null) return undefined;
     const syncable = syncablePart(userState);
@@ -221,37 +269,93 @@ export default function App() {
     showToastMessage('Signed out. Progress on this device stays here until you sign in again.');
   }
 
-  // Menu scroll position to restore once the menu has re-rendered after Back.
-  const pendingMenuScroll = useRef(null);
+  // Restore scroll position on Back navigation
+  const pendingScrollY = useRef(null);
   useLayoutEffect(() => {
-    if (!activeReader && pendingMenuScroll.current !== null) {
-      window.scrollTo(0, pendingMenuScroll.current);
-      pendingMenuScroll.current = null;
+    if (pendingScrollY.current !== null) {
+      window.scrollTo(0, pendingScrollY.current);
+      pendingScrollY.current = null;
     }
-  }, [activeReader]);
+  }, [currentView, selectedCategory, selectedSubcategory, activeReader]);
 
-  // History-API routing: every work has its own URL (/poems/poem-12), so the
-  // browser / Android back button returns to the menu and forward re-opens it.
+  function applyRoute(route) {
+    setCurrentView(route.view);
+    setSelectedCategory(route.categoryKey);
+    setSelectedSubcategory(route.subcategory || 'All');
+    setActiveReader(route.item ? readerFor(route.item) : null);
+  }
+
+  function navigateTo(url, { replace = false, playPop = false } = {}) {
+    setCelebration(null);
+    if (playPop) {
+      playStepPopSound(userStateRef.current.profile.soundEnabled !== false);
+    }
+    const currentFullUrl = `${window.location.pathname}${window.location.search}`;
+    if (!replace && currentFullUrl === url) {
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    if (!replace) {
+      window.history.replaceState(
+        { ...(window.history.state || {}), scrollY: window.scrollY },
+        '',
+        currentFullUrl
+      );
+      window.history.pushState({ fromApp: true, scrollY: 0 }, '', url);
+    } else {
+      window.history.replaceState(
+        { ...(window.history.state || {}), scrollY: 0 },
+        '',
+        url
+      );
+    }
+
+    const parsedUrl = new URL(url, window.location.origin);
+    const nextRoute = parseLocation(parsedUrl, allItemsByCategory);
+    applyRoute(nextRoute);
+    window.scrollTo(0, 0);
+  }
+
+  // History-API routing across all funnel steps and reader pages
   useEffect(() => {
     if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
     const { canonical } = parseLocation(window.location, allItemsByCategory);
-    if (canonical !== window.location.pathname || window.location.hash || window.location.search) {
+    const currentFull = `${window.location.pathname}${window.location.search}`;
+    if (canonical !== currentFull || window.location.hash) {
       window.history.replaceState(window.history.state, '', canonical);
     }
     const onPopState = (event) => {
+      setCelebration(null);
       const route = parseLocation(window.location, allItemsByCategory);
-      setSelectedCategory(route.categoryKey);
-      if (route.item) {
-        setActiveReader(readerFor(route.item));
-        window.scrollTo(0, 0);
-      } else {
-        pendingMenuScroll.current = event.state?.menuScrollY || 0;
-        setActiveReader(null);
-      }
+      pendingScrollY.current = event.state?.scrollY || 0;
+      applyRoute(route);
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, [allItemsByCategory]);
+
+  // Dynamic page title for SEO & browser history clarity
+  useEffect(() => {
+    const catLabel =
+      MAIN_CATEGORIES.find((c) => c.key === selectedCategory)?.pluralLabel || 'Library';
+    if (activeReader?.item) {
+      document.title = `${activeReader.item.title} — Bradbury 1000`;
+    } else if (currentView === 'tonight') {
+      document.title = `Tonight’s Curated Four — Bradbury 1000`;
+    } else if (currentView === 'choose-type') {
+      document.title = `Choose a Literary Form — Bradbury 1000`;
+    } else if (currentView === 'choose-genre') {
+      document.title = `Choose a Genre • ${catLabel} — Bradbury 1000`;
+    } else if (currentView === 'shelf') {
+      const sub = selectedSubcategory !== 'All' ? `${selectedSubcategory} • ` : '';
+      document.title = `${sub}${catLabel} — Bradbury 1000`;
+    } else if (currentView === 'journal') {
+      document.title = `Reading Ledger — Bradbury 1000`;
+    } else {
+      document.title = `Bradbury 1000 — Nightly Poem, Story, Essay & Korea/SF Chronicles`;
+    }
+  }, [currentView, selectedCategory, selectedSubcategory, activeReader]);
 
   const streakStats = useMemo(
     () =>
@@ -279,8 +383,13 @@ export default function App() {
   );
 
   const subcategories = useMemo(
-    () => getSubcategoriesForCategory(allItemsByCategory, selectedCategory),
-    [allItemsByCategory, selectedCategory]
+    () =>
+      getSubcategoriesForCategory(
+        allItemsByCategory,
+        selectedCategory,
+        userState.completedItems
+      ),
+    [allItemsByCategory, selectedCategory, userState.completedItems]
   );
 
   const { unreadItems, completedCategoryItems } = useMemo(
@@ -294,68 +403,188 @@ export default function App() {
     [allItemsByCategory, selectedCategory, selectedSubcategory, userState.completedItems]
   );
 
-  function handleSelectCategory(catKey) {
-    setSelectedCategory(catKey);
-    setSelectedSubcategory('All');
-    setActiveReader(null);
-    // Switching category tabs replaces the menu entry rather than stacking
-    // history, so Back from a work always lands on the menu you came from.
-    window.history.replaceState({ menuScrollY: 0 }, '', categoryPath(catKey));
-    window.scrollTo(0, 0);
+  const nextRecommendation = useMemo(
+    () => getNextRecommendedPillar(allItemsByCategory, userState.completedItems),
+    [allItemsByCategory, userState.completedItems]
+  );
+
+  const quartetEntries = useMemo(() => {
+    const freshDeal = dealTonightQuartet(
+      allItemsByCategory,
+      userState.completedItems,
+      quartetOffsets
+    );
+    return freshDeal.map((entry) => {
+      const lockedId = lockedQuartetIds[entry.categoryKey];
+      const lockedItem = lockedId
+        ? (allItemsByCategory[entry.categoryKey] || []).find((x) => x.id === lockedId)
+        : null;
+      return {
+        ...entry,
+        item: lockedItem || entry.item
+      };
+    });
+  }, [allItemsByCategory, userState.completedItems, quartetOffsets, lockedQuartetIds]);
+
+  /**
+   * Evaluates before/after Duolingo streak state and triggers the matching musical
+   * fanfare + animated Folio celebration stage!
+   */
+  function celebrateNewCompletion(prevState, nextCompletedItems, nextExternalLogs, title) {
+    const soundOn = prevState.profile.soundEnabled !== false;
+    const prevStats = computeStreakStats(
+      allItemsByCategory,
+      prevState.completedItems,
+      prevState.externalLogs
+    );
+    const nextStats = computeStreakStats(
+      allItemsByCategory,
+      nextCompletedItems,
+      nextExternalLogs
+    );
+
+    if (nextStats.totalCompleted <= prevStats.totalCompleted) {
+      return false;
+    }
+
+    setToast(null);
+
+    if (!prevStats.completedToday && nextStats.completedToday) {
+      playStreakExtendedSound(soundOn);
+      setCelebration({
+        id: Date.now(),
+        kind: 'streak_extended',
+        itemTitle: title,
+        prevStreak: prevStats.currentStreak,
+        newStreak: nextStats.currentStreak,
+        todayCount: nextStats.todayCount,
+        goldNights: nextStats.goldNights
+      });
+    } else if (prevStats.todayCount < 3 && nextStats.todayCount >= 3) {
+      playGoldNightSound(soundOn);
+      setCelebration({
+        id: Date.now(),
+        kind: 'gold_night',
+        itemTitle: title,
+        prevStreak: prevStats.currentStreak,
+        newStreak: nextStats.currentStreak,
+        todayCount: nextStats.todayCount,
+        goldNights: nextStats.goldNights
+      });
+    } else {
+      playStoryCompleteSound(soundOn);
+      setCelebration({
+        id: Date.now(),
+        kind: 'story_complete',
+        itemTitle: title,
+        prevStreak: prevStats.currentStreak,
+        newStreak: nextStats.currentStreak,
+        todayCount: nextStats.todayCount,
+        goldNights: nextStats.goldNights
+      });
+    }
+    return true;
+  }
+
+  function handleShuffleQuartetAll() {
+    playStepPopSound(soundEnabled);
+    const nextOffsets = {
+      poem: quartetOffsets.poem + 1,
+      story: quartetOffsets.story + 1,
+      essay: quartetOffsets.essay + 1,
+      personal: quartetOffsets.personal + 1
+    };
+    setQuartetOffsets(nextOffsets);
+    const nextDeal = dealTonightQuartet(
+      allItemsByCategory,
+      userState.completedItems,
+      nextOffsets
+    );
+    setLockedQuartetIds(
+      Object.fromEntries(nextDeal.map((entry) => [entry.categoryKey, entry.item.id]))
+    );
+    showToastMessage('Dealt four fresh unread picks across all pillars.');
+  }
+
+  function handleShuffleQuartetSlot(categoryKey) {
+    playStepPopSound(soundEnabled);
+    const nextOffsets = {
+      ...quartetOffsets,
+      [categoryKey]: (quartetOffsets[categoryKey] || 0) + 1
+    };
+    setQuartetOffsets(nextOffsets);
+    const nextDeal = dealTonightQuartet(
+      allItemsByCategory,
+      userState.completedItems,
+      nextOffsets
+    );
+    const updatedSlot = nextDeal.find((e) => e.categoryKey === categoryKey);
+    if (updatedSlot?.item) {
+      setLockedQuartetIds((prev) => ({
+        ...prev,
+        [categoryKey]: updatedSlot.item.id
+      }));
+    }
   }
 
   function openReader(item) {
-    // Remember where the menu was scrolled so Back returns to the same spot.
-    window.history.replaceState(
-      { ...(window.history.state || {}), menuScrollY: window.scrollY },
-      '',
-      window.location.pathname
-    );
-    window.history.pushState({ openedFromMenu: true }, '', itemPath(item));
-    setSelectedCategory(item.categoryKey);
-    setActiveReader(readerFor(item));
-    window.scrollTo(0, 0);
+    if (!item) return;
+    navigateTo(itemPath(item));
   }
 
   function closeReader() {
-    if (activeReader && window.history.state?.openedFromMenu) {
-      // Same as pressing the browser's Back button.
+    if (activeReader && window.history.state?.fromApp) {
       window.history.back();
       return;
     }
-    // Opened from a direct link: there is no menu entry behind us, so swap to it.
     const cat = activeReader?.categoryKey || selectedCategory;
-    window.history.replaceState({ menuScrollY: 0 }, '', categoryPath(cat));
-    setSelectedCategory(cat);
-    setActiveReader(null);
-    window.scrollTo(0, 0);
+    navigateTo(shelfPath(cat, 'All'), { replace: true });
+  }
+
+  function handleOpenSurpriseFromQuartet() {
+    const unreadInQuartet = quartetEntries.filter(
+      (e) => !userState.completedItems[e.item.id]?.completed
+    );
+    const recommendedEntry = unreadInQuartet.find((e) => e.isRecommendedNext);
+    const chosen =
+      recommendedEntry?.item ||
+      unreadInQuartet[0]?.item ||
+      quartetEntries[0]?.item ||
+      pickSurpriseItem(allItemsByCategory, userState.completedItems);
+    if (chosen) {
+      openReader(chosen);
+    }
   }
 
   function toggleItemCompleted(item) {
-    setUserState((prev) => {
-      const wasDone = Boolean(prev.completedItems[item.id]?.completed);
-      const nextDone = !wasDone;
-      const updated = {
-        ...prev.completedItems,
-        [item.id]: {
-          completed: nextDone,
-          completedAt: nextDone ? new Date().toISOString() : null,
-          categoryKey: item.categoryKey,
-          updatedAt: new Date().toISOString()
-        }
-      };
-      if (nextDone) {
-        showToastMessage(
-          `Completed "${item.title}"! Moved to Completed at the bottom & credited your streak.`
-        );
-      } else {
-        showToastMessage(`Moved "${item.title}" back to your Unread queue.`);
+    const prev = userStateRef.current;
+    const wasDone = Boolean(prev.completedItems[item.id]?.completed);
+    const nextDone = !wasDone;
+    const nowIso = new Date().toISOString();
+    const updatedCompleted = {
+      ...prev.completedItems,
+      [item.id]: {
+        completed: nextDone,
+        completedAt: nextDone ? nowIso : null,
+        categoryKey: item.categoryKey,
+        updatedAt: nowIso
       }
-      return {
-        ...prev,
-        completedItems: updated
-      };
-    });
+    };
+
+    const nextState = {
+      ...prev,
+      completedItems: updatedCompleted
+    };
+    userStateRef.current = nextState;
+    setUserState(nextState);
+
+    if (nextDone) {
+      celebrateNewCompletion(prev, updatedCompleted, prev.externalLogs, item.title);
+    } else {
+      setCelebration(null);
+      playUndoSound(prev.profile.soundEnabled !== false);
+      showToastMessage(`Moved "${item.title}" back to unread.`);
+    }
   }
 
   function handleDownloadSingleEpub(item) {
@@ -373,55 +602,49 @@ export default function App() {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
     downloadEpubBlob(blob, `bradbury-${item.id}-${safeSlug}.epub`);
-    showToastMessage(
-      `Downloaded "${item.title}.epub" (with analysis) for ElevenReader!`
-    );
+    showToastMessage(`Downloaded "${item.title}.epub" (with analysis) for ElevenReader!`);
   }
 
-  function handleDownloadUnreadNightBundle() {
-    const nextPoem =
-      allItemsByCategory.poem.find((i) => !userState.completedItems[i.id]?.completed) ||
-      allItemsByCategory.poem[0];
-    const nextStory =
-      allItemsByCategory.story.find((i) => !userState.completedItems[i.id]?.completed) ||
-      allItemsByCategory.story[0];
-    const nextEssay =
-      allItemsByCategory.essay.find((i) => !userState.completedItems[i.id]?.completed) ||
-      allItemsByCategory.essay[0];
-    const nextPersonal =
-      allItemsByCategory.personal.find((i) => !userState.completedItems[i.id]?.completed) ||
-      allItemsByCategory.personal[0];
+  function handleDownloadQuartetBundle(customEntries = null) {
+    const entries = customEntries || quartetEntries;
+    const chapters = entries
+      .filter((e) => e?.item)
+      .map((e) => ({
+        slotLabel:
+          e.categoryKey === 'personal'
+            ? `Personal (${e.item.region})`
+            : e.categoryLabel || e.item.slotLabel,
+        item: e.item
+      }));
 
-    const chapters = [
-      { slotLabel: 'Poem', item: nextPoem },
-      { slotLabel: 'Short Story', item: nextStory },
-      { slotLabel: 'Essay', item: nextEssay },
-      { slotLabel: `Personal (${nextPersonal.region})`, item: nextPersonal }
-    ].filter((c) => c.item);
+    if (chapters.length === 0) return;
 
+    const personalItem = entries.find((e) => e.categoryKey === 'personal')?.item;
     const blob = buildEpubBlob({
-      title: `Bradbury 1000 — Next Unread Quartet (.epub)`,
-      subtitle: `1 Poem, 1 Short Story, 1 Essay & 1 Personal (${nextPersonal?.region}) Story + Analyses`,
+      title: `Bradbury 1000 — Tonight's Curated Quartet (.epub)`,
+      subtitle: `1 Poem, 1 Short Story, 1 Essay & 1 ${
+        personalItem?.region || 'Personal'
+      } Chronicle + Analyses`,
       author: 'Bradbury 1000 Curated Anthology',
       uid: `urn:bradbury1000:next-quartet-${Date.now()}`,
       includeAnalysis: userState.profile.includeAnalysisInEpub !== false,
       chapters
     });
-    downloadEpubBlob(blob, `bradbury-1000-tonights-unread-quartet.epub`);
-    showToastMessage(
-      `Bundled your next unread Poem, Short Story, Essay & ${nextPersonal?.region} story into one .epub!`
-    );
+    downloadEpubBlob(blob, `bradbury-1000-tonights-quartet.epub`);
+    showToastMessage(`Bundled Tonight's Quartet into one .epub for ElevenReader!`);
   }
 
   function markItemCompleted(item, source = 'elevenreader') {
-    setUserState((prev) => {
-      const nextState = {
-        ...prev,
-        completedItems: markItemCompletedState(prev.completedItems, item, source)
-      };
-      saveState(nextState);
-      return nextState;
-    });
+    const prev = userStateRef.current;
+    const updatedCompleted = markItemCompletedState(prev.completedItems, item, source);
+    const nextState = {
+      ...prev,
+      completedItems: updatedCompleted
+    };
+    userStateRef.current = nextState;
+    saveState(nextState);
+    setUserState(nextState);
+    return celebrateNewCompletion(prev, updatedCompleted, prev.externalLogs, item.title);
   }
 
   async function handleElevenReaderShare(item, mode = 'text') {
@@ -450,11 +673,11 @@ export default function App() {
             title: `${item.title} — ${item.author || item.region}`,
             files: [file]
           });
-          markItemCompleted(item, 'elevenreader-epub');
+          const celebrated = markItemCompleted(item, 'elevenreader-epub');
           await sharePromise;
-          showToastMessage(
-            `Shared "${item.title}.epub" to ElevenReader & marked as completed!`
-          );
+          if (!celebrated) {
+            showToastMessage(`Shared "${item.title}.epub" to ElevenReader!`);
+          }
           return;
         }
       } catch {
@@ -468,34 +691,36 @@ export default function App() {
           title: `${item.title} — ${item.author || item.region}`,
           text: fullTextPayload
         });
-        markItemCompleted(item, 'elevenreader');
+        const celebrated = markItemCompleted(item, 'elevenreader');
         await sharePromise;
-        showToastMessage(
-          `Sent "${item.title}" to ElevenReader & marked as completed!`
-        );
+        if (!celebrated) {
+          showToastMessage(`Sent "${item.title}" to ElevenReader!`);
+        }
         return;
       } catch {
-        // user canceled or desktop fallback — ensure item is still marked completed
         markItemCompleted(item, 'elevenreader');
       }
     }
 
-    markItemCompleted(item, 'elevenreader');
+    const celebrated = markItemCompleted(item, 'elevenreader');
 
     try {
       await navigator.clipboard.writeText(fullTextPayload);
-      showToastMessage(
-        `Sent "${item.title}" to ElevenReader (copied full text) & marked as completed!`
-      );
+      if (!celebrated) {
+        showToastMessage(`Copied "${item.title}" full text for ElevenReader!`);
+      }
     } catch {
       const cleanUrl = `${window.location.origin}${item.staticUrl || ''}`;
       window.open(cleanUrl, '_blank', 'noopener,noreferrer');
-      showToastMessage(`Opened "${item.title}" for ElevenReader & marked as completed!`);
+      if (!celebrated) {
+        showToastMessage(`Opened "${item.title}" for ElevenReader!`);
+      }
     }
   }
 
   function logExternalReading({ title, author, slotKey }) {
     if (!title || !title.trim()) return;
+    const prev = userStateRef.current;
     const entry = {
       id: `ext-${Date.now()}`,
       slotKey,
@@ -503,12 +728,31 @@ export default function App() {
       author: (author || 'External Anthology').trim(),
       loggedAt: new Date().toISOString()
     };
-    setUserState((prev) => ({
+    const nextExternalLogs = [entry, ...prev.externalLogs];
+    const nextState = {
       ...prev,
-      externalLogs: [entry, ...prev.externalLogs]
-    }));
+      externalLogs: nextExternalLogs
+    };
+    userStateRef.current = nextState;
+    setUserState(nextState);
     setShowExternalModal(false);
-    showToastMessage(`Logged "${title}" to your permanent library & credited your streak!`);
+    celebrateNewCompletion(prev, prev.completedItems, nextExternalLogs, entry.title);
+  }
+
+  function handleToggleSound() {
+    setUserState((prev) => {
+      const nextSound = prev.profile.soundEnabled === false;
+      if (nextSound) {
+        playMascotChirpSound(true);
+      }
+      return {
+        ...prev,
+        profile: {
+          ...prev.profile,
+          soundEnabled: nextSound
+        }
+      };
+    });
   }
 
   function handleToggleTheme() {
@@ -528,17 +772,19 @@ export default function App() {
     }));
   }
 
-  const currentCategoryLabel =
-    MAIN_CATEGORIES.find((c) => c.key === selectedCategory)?.label || 'Reading';
-
   return (
     <div className="app-root">
       <TopBar
+        currentView={activeReader ? 'reader' : currentView}
         streakStats={streakStats}
         theme={userState.profile.theme}
+        soundEnabled={soundEnabled}
+        onToggleSound={handleToggleSound}
         onToggleTheme={handleToggleTheme}
-        onCloseReader={closeReader}
-        onDownloadUnreadBundle={handleDownloadUnreadNightBundle}
+        onNavigateHome={() => navigateTo(homePath())}
+        onNavigateTonight={() => navigateTo(tonightPath(), { playPop: true })}
+        onNavigateExplore={() => navigateTo(chooseTypePath(), { playPop: true })}
+        onNavigateJournal={() => navigateTo(journalPath())}
         onOpenExternalModal={() => setShowExternalModal(true)}
         onOpenProfileModal={() => setShowProfileModal(true)}
         authUser={authUser}
@@ -558,120 +804,139 @@ export default function App() {
             onDownloadEpub={handleDownloadSingleEpub}
             onToggleComplete={toggleItemCompleted}
           />
+        ) : currentView === 'tonight' ? (
+          <TonightQuartetView
+            quartetEntries={quartetEntries}
+            completedItems={userState.completedItems}
+            streakStats={streakStats}
+            soundEnabled={soundEnabled}
+            onBackHome={() => navigateTo(homePath())}
+            onShuffleAll={handleShuffleQuartetAll}
+            onShuffleSingleSlot={handleShuffleQuartetSlot}
+            onOpenSurpriseFromQuartet={handleOpenSurpriseFromQuartet}
+            onDownloadQuartetEpub={() => handleDownloadQuartetBundle(quartetEntries)}
+            onOpenReader={openReader}
+            onToggleComplete={toggleItemCompleted}
+            onDownloadSingleEpub={handleDownloadSingleEpub}
+            onShareElevenReader={handleElevenReaderShare}
+            onSelectGenreInShelf={(catKey, genre) =>
+              navigateTo(shelfPath(catKey, genre), { playPop: true })
+            }
+          />
+        ) : currentView === 'choose-type' ? (
+          <ChooseTypeView
+            allItemsByCategory={allItemsByCategory}
+            completedItems={userState.completedItems}
+            streakStats={streakStats}
+            soundEnabled={soundEnabled}
+            onBackHome={() => navigateTo(homePath())}
+            onSelectType={(catKey) =>
+              navigateTo(chooseGenrePath(catKey), { playPop: true })
+            }
+          />
+        ) : currentView === 'choose-genre' ? (
+          <ChooseGenreView
+            categoryKey={selectedCategory}
+            subcategories={subcategories}
+            streakStats={streakStats}
+            soundEnabled={soundEnabled}
+            onBackToTypes={() => navigateTo(chooseTypePath())}
+            onSelectGenre={(genreId) =>
+              navigateTo(shelfPath(selectedCategory, genreId), { playPop: true })
+            }
+            onSurpriseInCategory={() => {
+              const pick = pickSurpriseItem(allItemsByCategory, userState.completedItems, {
+                categoryKey: selectedCategory
+              });
+              if (pick) openReader(pick);
+            }}
+          />
+        ) : currentView === 'shelf' ? (
+          <ShelfView
+            selectedCategory={selectedCategory}
+            selectedSubcategory={selectedSubcategory}
+            subcategories={subcategories}
+            unreadItems={unreadItems}
+            completedCategoryItems={completedCategoryItems}
+            onBackToGenres={() => navigateTo(chooseGenrePath(selectedCategory))}
+            onChangeType={() => navigateTo(chooseTypePath())}
+            onSelectSubcategory={(subId) =>
+              navigateTo(shelfPath(selectedCategory, subId), { replace: true })
+            }
+            onSurpriseFromShelf={() => {
+              const pick = pickSurpriseItem(allItemsByCategory, userState.completedItems, {
+                categoryKey: selectedCategory,
+                subcategory: selectedSubcategory
+              });
+              if (pick) openReader(pick);
+            }}
+            onOpenReader={openReader}
+            onToggleComplete={toggleItemCompleted}
+            onDownloadEpub={handleDownloadSingleEpub}
+            onShareElevenReader={handleElevenReaderShare}
+          />
+        ) : currentView === 'journal' ? (
+          <JournalView
+            streakStats={streakStats}
+            allItemsByCategory={allItemsByCategory}
+            completedItems={userState.completedItems}
+            externalLogs={userState.externalLogs}
+            soundEnabled={soundEnabled}
+            onBackHome={() => navigateTo(homePath())}
+            onSelectType={(catKey) =>
+              navigateTo(chooseGenrePath(catKey), { playPop: true })
+            }
+            onOpenReader={openReader}
+            onToggleComplete={toggleItemCompleted}
+            onOpenExternalModal={() => setShowExternalModal(true)}
+            onDownloadUnreadBundle={() => handleDownloadQuartetBundle()}
+            onOpenPwaModal={() => setShowPwaModal(true)}
+          />
         ) : (
-          <>
-            <CategoryDeck
-              selectedCategory={selectedCategory}
-              selectedSubcategory={selectedSubcategory}
-              subcategories={subcategories}
-              allItemsByCategory={allItemsByCategory}
-              completedItems={userState.completedItems}
-              streakStats={streakStats}
-              onSelectCategory={handleSelectCategory}
-              onSelectSubcategory={setSelectedSubcategory}
-              onOpenPwaModal={() => setShowPwaModal(true)}
-            />
-
-            <StreakCelebrationBanner
-              streakStats={streakStats}
-              nextRecommendation={getNextRecommendedPillar(
-                allItemsByCategory,
-                userState.completedItems
-              )}
-              onJumpToRecommendation={(rec) => {
-                if (rec?.categoryKey) {
-                  handleSelectCategory(rec.categoryKey);
-                }
-              }}
-            />
-
-            {/* UNREAD OPTIONS SECTION */}
-            <section className="options-section" aria-label="Unread Reading Options">
-              <div className="section-heading-row">
-                <h3 className="section-heading-title">
-                  Unread {currentCategoryLabel} Options ({unreadItems.length})
-                </h3>
-                {selectedSubcategory !== 'All' && (
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    onClick={() => setSelectedSubcategory('All')}
-                  >
-                    Showing &ldquo;{selectedSubcategory}&rdquo; • Reset to All
-                  </button>
-                )}
-              </div>
-
-              {unreadItems.length === 0 ? (
-                <div className="empty-filter-card">
-                  <p>
-                    You&rsquo;ve completed every reading in this genre filter! Switch to{' '}
-                    <strong>All</strong> or pick another category above.
-                  </p>
-                </div>
-              ) : (
-                <div className="quartet-grid" id="unread-options-grid">
-                  {unreadItems.map((item) => (
-                    <ReadingOptionCard
-                      key={item.id}
-                      item={item}
-                      completed={false}
-                      onOpenReader={() => openReader(item)}
-                      onToggleComplete={() => toggleItemCompleted(item)}
-                      onDownloadEpub={() => handleDownloadSingleEpub(item)}
-                      onShareElevenReader={() => handleElevenReaderShare(item)}
-                      onSelectGenre={(g) => setSelectedSubcategory(g)}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-
-            {/* COMPLETED (GRAYED OUT AT THE BOTTOM) SECTION */}
-            {completedCategoryItems.length > 0 && (
-              <section
-                className="completed-section"
-                id="completed-options-section"
-                aria-label="Completed Reading Options"
-              >
-                <div className="section-heading-row">
-                  <h3 className="section-heading-title muted">
-                    Completed ({completedCategoryItems.length})
-                  </h3>
-                  <span className="completed-hint">
-                    Already read — tap any card to re-read or uncheck
-                  </span>
-                </div>
-
-                <div className="quartet-grid">
-                  {completedCategoryItems.map((item) => (
-                    <ReadingOptionCard
-                      key={item.id}
-                      item={item}
-                      completed={true}
-                      onOpenReader={() => openReader(item)}
-                      onToggleComplete={() => toggleItemCompleted(item)}
-                      onDownloadEpub={() => handleDownloadSingleEpub(item)}
-                      onShareElevenReader={() => handleElevenReaderShare(item)}
-                      onSelectGenre={(g) => setSelectedSubcategory(g)}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
-          </>
+          <HomeFunnelView
+            streakStats={streakStats}
+            unreadCounts={unreadCounts}
+            nextRecommendation={nextRecommendation}
+            soundEnabled={soundEnabled}
+            onChooseTonightQuartet={() => navigateTo(tonightPath(), { playPop: true })}
+            onChooseCustomPath={() => navigateTo(chooseTypePath(), { playPop: true })}
+            onOpenSurpriseNow={() => {
+              const pick =
+                nextRecommendation?.item ||
+                pickSurpriseItem(allItemsByCategory, userState.completedItems);
+              if (pick) openReader(pick);
+            }}
+            onJumpToRecommendation={(rec) => {
+              if (rec?.item) {
+                openReader(rec.item);
+              } else if (rec?.categoryKey) {
+                navigateTo(chooseGenrePath(rec.categoryKey), { playPop: true });
+              }
+            }}
+            onDownloadUnreadBundle={() => handleDownloadQuartetBundle()}
+            onOpenExternalModal={() => setShowExternalModal(true)}
+            onOpenPwaModal={() => setShowPwaModal(true)}
+            onOpenJournal={() => navigateTo(journalPath())}
+          />
         )}
       </main>
 
       {!activeReader && (
         <BottomNav
-          selectedCategory={selectedCategory}
-          activeReader={activeReader}
-          unreadCounts={unreadCounts}
-          onSelectCategory={handleSelectCategory}
-          onDownloadUnreadBundle={handleDownloadUnreadNightBundle}
+          currentView={currentView}
+          totalCompleted={streakStats.totalCompleted}
+          onNavigateHome={() => navigateTo(homePath())}
+          onNavigateTonight={() => navigateTo(tonightPath(), { playPop: true })}
+          onNavigateExplore={() => navigateTo(chooseTypePath(), { playPop: true })}
+          onNavigateJournal={() => navigateTo(journalPath())}
         />
       )}
+
+      <StreakCelebrationOverlay
+        celebration={celebration}
+        streakStats={streakStats}
+        onDismiss={dismissCelebration}
+      />
 
       {showExternalModal && (
         <ExternalBookModal

@@ -103,8 +103,17 @@ export default function ReaderView({
         </button>
 
         <div className="reader-toolbar-center">
-          <span className="reader-pct-badge" id="reader-scroll-pct">
-            {scrollProgress}%
+          <span
+            className={`reader-pct-badge ${
+              scrollProgress >= 90 ? 'almost-done' : scrollProgress >= 50 ? 'halfway' : ''
+            }`}
+            id="reader-scroll-pct"
+          >
+            {scrollProgress >= 95
+              ? `${scrollProgress}% • Ready!`
+              : scrollProgress >= 50
+              ? `${scrollProgress}% • Halfway`
+              : `${scrollProgress}%`}
           </span>
           {Array.isArray(item.analysis) && item.analysis.length > 0 && (
             <button

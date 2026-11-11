@@ -93,14 +93,24 @@ const progressDoc = (uid) => doc(db, 'bradbury', uid);
 
 /** Only the parts of user state that belong to the account (and are synced). */
 export function syncablePart(state) {
-  const { theme, readerFontScale, readerLineHeight, includeAnalysisInEpub } = state.profile || {};
+  const {
+    theme,
+    readerFontScale,
+    readerLineHeight,
+    includeAnalysisInEpub,
+    soundEnabled
+  } = state.profile || {};
   return {
     completedItems: state.completedItems || {},
     externalLogs: state.externalLogs || [],
     prefs: Object.fromEntries(
-      Object.entries({ theme, readerFontScale, readerLineHeight, includeAnalysisInEpub }).filter(
-        ([, v]) => v !== undefined && v !== null
-      )
+      Object.entries({
+        theme,
+        readerFontScale,
+        readerLineHeight,
+        includeAnalysisInEpub,
+        soundEnabled
+      }).filter(([, v]) => v !== undefined && v !== null)
     )
   };
 }

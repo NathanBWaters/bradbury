@@ -3,7 +3,7 @@
  * Ensures all 62 pre-baked readings (14 Poems, 14 Stories, 14 Essays, 20 Korea/SF Chronicles)
  * and static /read/day-* pages work seamlessly offline.
  */
-const CACHE_NAME = 'bradbury-1000-pwa-v4';
+const CACHE_NAME = 'bradbury-1000-pwa-v5';
 const PRECACHE_URLS = [
   '/',
   '/index.html',

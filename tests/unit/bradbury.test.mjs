@@ -12,12 +12,23 @@ import {
   filterAndPartitionItems,
   computeStreakStats,
   getNextRecommendedPillar,
+  dealTonightQuartet,
+  pickSurpriseItem,
   computeStoryAudioMetrics,
   markItemCompletedState
 } from '../../src/utils/catalogEngine.js';
 import { formatFullPlainTextForElevenReader } from '../../src/utils/plainTextFormatter.js';
 import { buildEpubBlob } from '../../src/utils/epubGenerator.js';
-import { parseLocation, itemPath, categoryPath } from '../../src/utils/router.js';
+import {
+  parseLocation,
+  itemPath,
+  categoryPath,
+  tonightPath,
+  chooseTypePath,
+  chooseGenrePath,
+  shelfPath,
+  journalPath
+} from '../../src/utils/router.js';
 
 const LITERARY_ANALYSIS_HEADINGS = [
   'I. What It Really Means',
@@ -30,8 +41,16 @@ const LITERARY_ANALYSIS_HEADINGS = [
 import {
   DEFAULT_USER_STATE,
   evaluateNightStatus,
-  recomputeStreakSummary
+  recomputeStreakSummary,
+  computeDuolingoStreak,
+  addDaysToDateKey
 } from '../../src/utils/streakEngine.js';
+import {
+  playStoryCompleteSound,
+  playStreakExtendedSound,
+  playGoldNightSound,
+  playMascotChirpSound
+} from '../../src/utils/soundEffects.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -103,13 +122,19 @@ describe('Bradbury 1000 — Catalog Engine & Subcategory Partitioning', () => {
   });
 
   it('computes accurate 2-tier streak stats and next recommended pillar', () => {
+    const now = new Date(2026, 10, 10, 21, 0, 0);
+    const iso = now.toISOString();
     const completedMap = {
-      [catalog.story[0].id]: { completed: true },
-      [catalog.poem[0].id]: { completed: true },
-      [catalog.essay[0].id]: { completed: true }
+      [catalog.story[0].id]: { completed: true, completedAt: iso },
+      [catalog.poem[0].id]: { completed: true, completedAt: iso },
+      [catalog.essay[0].id]: { completed: true, completedAt: iso }
     };
-    const stats = computeStreakStats(catalog, completedMap, []);
+    const stats = computeStreakStats(catalog, completedMap, [], { now });
     assert.equal(stats.totalCompleted, 3);
+    assert.equal(stats.currentStreak, 1, '3 reads on the same day equal a 1-day Duolingo streak');
+    assert.equal(stats.completedToday, true);
+    assert.equal(stats.todayCount, 3);
+    assert.equal(stats.todayGoldUnlocked, true);
     assert.equal(stats.goldNights, 1);
     assert.equal(stats.categoriesTouched, 3);
     assert.equal(stats.freezeTokens, 1);
@@ -118,6 +143,57 @@ describe('Bradbury 1000 — Catalog Engine & Subcategory Partitioning', () => {
     const nextRec = getNextRecommendedPillar(catalog, completedMap);
     assert.ok(nextRec);
     assert.equal(nextRec.categoryKey, 'personal');
+  });
+
+  it('normalizes essay genres cleanly without 1-item singleton noise and organizes personal works by place + 5 themes', () => {
+    const essaySubcats = getSubcategoriesForCategory(catalog, 'essay');
+    assert.equal(essaySubcats[0].id, 'All');
+    assert.equal(essaySubcats.length, 7, 'Essays should have All + 6 cohesive genres');
+    assert.ok(
+      essaySubcats.slice(1).every((s) => s.count >= 5),
+      'Every normalized essay genre should contain multiple essays'
+    );
+
+    const personalSubcats = getSubcategoriesForCategory(catalog, 'personal');
+    assert.equal(personalSubcats[0].id, 'All');
+    assert.equal(personalSubcats[1].id, 'Korea');
+    assert.equal(personalSubcats[1].count, 50);
+    assert.equal(personalSubcats[2].id, 'San Francisco');
+    assert.equal(personalSubcats[2].count, 50);
+    assert.equal(personalSubcats.length, 8, 'Personal should have All + 2 places + 5 cross-Pacific themes');
+
+    const themePartition = filterAndPartitionItems(
+      catalog,
+      'personal',
+      'Architecture & Urban Design',
+      {}
+    );
+    assert.ok(themePartition.unreadItems.length >= 10);
+  });
+
+  it('deals 4 curated unread works across the 4 pillars and rotates picks on shuffle', () => {
+    const completedMap = {
+      [catalog.poem[0].id]: { completed: true }
+    };
+    const dealA = dealTonightQuartet(catalog, completedMap, 0);
+    const dealB = dealTonightQuartet(catalog, completedMap, 1);
+
+    assert.equal(dealA.length, 4);
+    assert.deepEqual(
+      dealA.map((e) => e.categoryKey),
+      ['poem', 'story', 'essay', 'personal']
+    );
+    assert.notEqual(dealA[0].item.id, catalog.poem[0].id, 'Completed poem must be skipped');
+    assert.ok(
+      dealA.some((entry, idx) => entry.item.id !== dealB[idx].item.id),
+      'Shuffling seed should deal fresh picks'
+    );
+
+    const surprise = pickSurpriseItem(catalog, completedMap, {
+      categoryKey: 'story',
+      seed: 3
+    });
+    assert.equal(surprise.categoryKey, 'story');
   });
 });
 
@@ -216,8 +292,113 @@ describe('Bradbury 1000 — Spec-Compliant Pure-JS EPUB 2/3 Generator', () => {
   });
 });
 
-describe('Bradbury 1000 — 2-Tier Duolingo Streak Engine', () => {
-  it('evaluates Night Status accurately (unlit, flame, gold, diamond)', () => {
+describe('Bradbury 1000 — Authentic Duolingo Calendar-Day Streak Engine & Sound Synthesizer', () => {
+  const localIsoForKey = (dateKey) => {
+    const [y, m, d] = dateKey.split('-').map(Number);
+    return new Date(y, m - 1, d, 20, 30, 0).toISOString();
+  };
+
+  it('starts at 0 (unstarted) with zero completions rather than a fake 1', () => {
+    const s = computeDuolingoStreak({}, [], { now: new Date(2026, 10, 10, 21, 0, 0) });
+    assert.equal(s.currentStreak, 0);
+    assert.equal(s.longestStreak, 0);
+    assert.equal(s.completedToday, false);
+    assert.equal(s.streakState, 'unstarted');
+    assert.equal(s.freezeTokens, 1);
+    assert.equal(s.weekDays.length, 7);
+    assert.ok(s.weekDays.every((d) => d.status === 'empty'));
+  });
+
+  it('counts multiple completions on the same day as a 1-day streak while unlocking Gold Night at 3 reads', () => {
+    const todayKey = '2026-11-10';
+    const now = new Date(2026, 10, 10, 22, 0, 0);
+    const completed = {
+      'poem-1': { completed: true, completedAt: localIsoForKey(todayKey) },
+      'story-1': { completed: true, completedAt: localIsoForKey(todayKey) },
+      'essay-1': { completed: true, completedAt: localIsoForKey(todayKey) },
+      'personal-1': { completed: true, completedAt: localIsoForKey(todayKey) }
+    };
+    const s = computeDuolingoStreak(completed, [], { now });
+    assert.equal(s.currentStreak, 1, '4 reads on Day 1 must keep currentStreak === 1');
+    assert.equal(s.completedToday, true);
+    assert.equal(s.todayCount, 4);
+    assert.equal(s.todayGoldUnlocked, true);
+    assert.equal(s.goldNights, 1);
+    assert.equal(s.streakState, 'extended_today');
+    assert.equal(s.weekDays[6].status, 'gold');
+  });
+
+  it('marks an active streak from yesterday as at_risk until today’s first read extends it', () => {
+    const now = new Date(2026, 10, 10, 19, 0, 0);
+    const completed = {
+      'poem-1': { completed: true, completedAt: localIsoForKey('2026-11-07') },
+      'poem-2': { completed: true, completedAt: localIsoForKey('2026-11-08') },
+      'poem-3': { completed: true, completedAt: localIsoForKey('2026-11-09') }
+    };
+    const beforeToday = computeDuolingoStreak(completed, [], { now });
+    assert.equal(beforeToday.currentStreak, 3);
+    assert.equal(beforeToday.completedToday, false);
+    assert.equal(beforeToday.streakState, 'at_risk');
+
+    const afterToday = computeDuolingoStreak(
+      {
+        ...completed,
+        'poem-4': { completed: true, completedAt: localIsoForKey('2026-11-10') }
+      },
+      [],
+      { now }
+    );
+    assert.equal(afterToday.currentStreak, 4);
+    assert.equal(afterToday.completedToday, true);
+    assert.equal(afterToday.streakState, 'extended_today');
+  });
+
+  it('automatically consumes a Streak Freeze on 1 missed calendar day and resets to 0 if out of freezes', () => {
+    const now = new Date(2026, 10, 10, 20, 0, 0);
+    // Read Nov 6, 7, 8; missed Nov 9 (yesterday); not yet read Nov 10 (today)
+    const completed = {
+      a: { completed: true, completedAt: localIsoForKey('2026-11-06') },
+      b: { completed: true, completedAt: localIsoForKey('2026-11-07') },
+      c: { completed: true, completedAt: localIsoForKey('2026-11-08') }
+    };
+    const saved = computeDuolingoStreak(completed, [], { now, initialFreezeTokens: 1 });
+    assert.equal(saved.currentStreak, 3, 'Streak Freeze preserves the 3-day streak without incrementing');
+    assert.equal(saved.freezeTokens, 0, 'Starter freeze token was consumed on Nov 9');
+    assert.equal(saved.frozeYesterday, true);
+    assert.equal(saved.streakState, 'frozen_saved');
+    assert.equal(saved.weekDays[5].status, 'frozen', 'Yesterday appears frozen in 7-day strip');
+
+    // Now simulate missing 2 consecutive days (Nov 8 & Nov 9) with only 1 freeze -> breaks streak!
+    const broken = computeDuolingoStreak(
+      {
+        a: { completed: true, completedAt: localIsoForKey('2026-11-05') },
+        b: { completed: true, completedAt: localIsoForKey('2026-11-06') },
+        c: { completed: true, completedAt: localIsoForKey('2026-11-07') }
+      },
+      [],
+      { now, initialFreezeTokens: 1 }
+    );
+    assert.equal(broken.currentStreak, 0, 'Missing 2 days with 1 freeze resets streak to 0');
+    assert.equal(broken.longestStreak, 3, 'Longest streak remains preserved at 3');
+    assert.equal(broken.streakState, 'broken');
+  });
+
+  it('refills +1 Streak Freeze on every 7-day streak milestone up to max 2', () => {
+    const startKey = '2026-11-04';
+    const completed = {};
+    for (let i = 0; i < 7; i++) {
+      const key = addDaysToDateKey(startKey, i);
+      completed[`item-${i}`] = { completed: true, completedAt: localIsoForKey(key) };
+    }
+    const s = computeDuolingoStreak(completed, [], {
+      now: new Date(2026, 10, 10, 21, 0, 0),
+      initialFreezeTokens: 1
+    });
+    assert.equal(s.currentStreak, 7);
+    assert.equal(s.freezeTokens, 2, 'Reaching a 7-day streak awards +1 Streak Freeze (max 2)');
+  });
+
+  it('evaluates legacy Night Status & no-ops sound synthesizer cleanly in non-browser environments', () => {
     assert.equal(evaluateNightStatus({}).tier, 'unlit');
     assert.equal(evaluateNightStatus({ poem: true }).tier, 'flame');
     assert.equal(evaluateNightStatus({ poem: true, story: true, essay: true }).tier, 'gold');
@@ -225,19 +406,22 @@ describe('Bradbury 1000 — 2-Tier Duolingo Streak Engine', () => {
       evaluateNightStatus({ poem: true, story: true, essay: true, korea: true }).tier,
       'diamond'
     );
-  });
 
-  it('recomputes multi-night streak summary and Streak Freeze awards accurately', () => {
-    assert.ok(DEFAULT_USER_STATE.streak.freezeTokens >= 1);
     const completedSlots = {
       1: { poem: true, story: true, essay: true, korea: false, sf: false },
       2: { poem: true, story: false, essay: false, korea: false, sf: false },
       3: { poem: true, story: true, essay: true, korea: true, sf: false }
     };
     const summary = recomputeStreakSummary(completedSlots, 1);
-    assert.equal(summary.litFlameDays, 3, 'Should count 3 active flame nights');
-    assert.equal(summary.goldNightsCount, 2, 'Should count 2 Gold Trio nights');
-    assert.equal(summary.diamondNightsCount, 1, 'Should count 1 Diamond Quartet night');
+    assert.equal(summary.litFlameDays, 3);
+    assert.equal(summary.goldNightsCount, 2);
+    assert.equal(summary.diamondNightsCount, 1);
+
+    // Sound effects return false gracefully when Web Audio API is absent in Node
+    assert.equal(playStoryCompleteSound(true), false);
+    assert.equal(playStreakExtendedSound(true), false);
+    assert.equal(playGoldNightSound(true), false);
+    assert.equal(playMascotChirpSound(false), false);
   });
 });
 
@@ -362,14 +546,40 @@ describe('Bradbury 1000 — Dataset Verbatim, Key Context & Single-Text Analysis
 
 
 
-describe('History-API router (each work gets its own back-button-friendly URL)', () => {
+describe('History-API router (multi-page funnel & per-work URLs)', () => {
   const catalog = buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces);
   const loc = (pathname, search = '', hash = '') => ({ pathname, search, hash });
 
-  it('maps the root and category paths to the menu', () => {
-    assert.deepEqual(parseLocation(loc('/'), catalog), { categoryKey: 'story', item: null, canonical: '/' });
-    assert.equal(parseLocation(loc('/poems'), catalog).categoryKey, 'poem');
-    assert.equal(parseLocation(loc('/poems'), catalog).item, null);
+  it('maps root, funnel paths, and genre shelf paths cleanly', () => {
+    assert.deepEqual(parseLocation(loc('/'), catalog), {
+      view: 'home',
+      categoryKey: 'story',
+      subcategory: 'All',
+      item: null,
+      canonical: '/'
+    });
+    assert.equal(parseLocation(loc(tonightPath()), catalog).view, 'tonight');
+    assert.equal(parseLocation(loc(chooseTypePath()), catalog).view, 'choose-type');
+    assert.equal(parseLocation(loc(journalPath()), catalog).view, 'journal');
+
+    const choosePoems = parseLocation(loc(chooseGenrePath('poem')), catalog);
+    assert.equal(choosePoems.view, 'choose-genre');
+    assert.equal(choosePoems.categoryKey, 'poem');
+
+    const poemShelf = parseLocation(loc('/poems'), catalog);
+    assert.equal(poemShelf.view, 'shelf');
+    assert.equal(poemShelf.categoryKey, 'poem');
+    assert.equal(poemShelf.subcategory, 'All');
+    assert.equal(poemShelf.item, null);
+
+    const sciFiUrl = shelfPath('story', 'Sci-Fi & Speculative');
+    const sciFiQuery = sciFiUrl.slice(sciFiUrl.indexOf('?'));
+    const sciFiShelf = parseLocation(loc('/stories', sciFiQuery), catalog);
+    assert.equal(sciFiShelf.view, 'shelf');
+    assert.equal(sciFiShelf.categoryKey, 'story');
+    assert.equal(sciFiShelf.subcategory, 'Sci-Fi & Speculative');
+    assert.equal(sciFiShelf.canonical, sciFiUrl);
+
     assert.equal(parseLocation(loc('/personal'), catalog).categoryKey, 'personal');
   });
 
@@ -377,6 +587,7 @@ describe('History-API router (each work gets its own back-button-friendly URL)',
     for (const cat of ['poem', 'story', 'essay', 'personal']) {
       for (const item of catalog[cat]) {
         const route = parseLocation(loc(itemPath(item)), catalog);
+        assert.equal(route.view, 'reader');
         assert.equal(route.item?.id, item.id);
         assert.equal(route.categoryKey, cat);
         assert.ok(itemPath(item).startsWith(categoryPath(cat) + '/'));
@@ -384,12 +595,14 @@ describe('History-API router (each work gets its own back-button-friendly URL)',
     }
   });
 
-  it('falls back to the category menu for unknown ids and upgrades legacy links', () => {
+  it('falls back to the category shelf for unknown ids and upgrades legacy links', () => {
     const unknown = parseLocation(loc('/essays/essay-9999'), catalog);
+    assert.equal(unknown.view, 'shelf');
     assert.equal(unknown.item, null);
     assert.equal(unknown.canonical, '/essays');
     assert.equal(parseLocation(loc('/', '?category=poem'), catalog).canonical, '/poems');
     const legacy = parseLocation(loc('/', '', '#/read/day-3/essay'), catalog);
+    assert.equal(legacy.view, 'reader');
     assert.equal(legacy.item?.categoryKey, 'essay');
     assert.equal(legacy.canonical, itemPath(legacy.item));
   });

@@ -231,6 +231,19 @@ export function ProfileSettingsModal({
           </label>
         </div>
 
+        <div className="form-field">
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={profile.soundEnabled !== false}
+              onChange={(e) => onUpdateProfile({ soundEnabled: e.target.checked })}
+            />
+            <span>
+              Play delightful celebration chimes &amp; streak fanfares
+            </span>
+          </label>
+        </div>
+
         <div className="modal-actions">
           <button type="button" className="btn-primary" onClick={onClose}>
             Save &amp; Close
@@ -263,15 +276,15 @@ export function PwaInstallModal({ deferredPrompt, onTriggerInstall, onClose }) {
             </h3>
             <span className="pwa-status-pill">
               <CheckCircle2 size={13} />
-              Offline Service Worker Active • 62 Works Cached
+              Offline Service Worker Active • 400 Works Ready
             </span>
           </div>
         </div>
 
         <p className="modal-subtext" style={{ marginTop: '0.85rem' }}>
-          Install <strong>Bradbury 1000</strong> to your phone’s Home Screen for a full-screen,
-          distraction-free bedside reading experience with complete offline access to all 14 Poems,
-          14 Short Stories, 14 Essays, and 20 Korea &amp; San Francisco Chronicles.
+          Install <strong>Bradbury 1000</strong> to your phone&rsquo;s Home Screen for a full-screen,
+          distraction-free bedside reading experience with complete offline access to all 100 Poems,
+          100 Short Stories, 100 Essays, and 100 Korea &amp; San Francisco Chronicles.
         </p>
 
         <div className="pwa-steps-grid">

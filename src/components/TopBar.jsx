@@ -3,10 +3,11 @@ import {
   Flame,
   Award,
   Snowflake,
-  Download,
   PlusCircle,
   Sun,
   Moon,
+  Volume2,
+  VolumeX,
   User,
   LogIn,
   Cloud,
@@ -14,18 +15,49 @@ import {
 } from 'lucide-react';
 
 export default function TopBar({
+  currentView,
   streakStats,
   theme,
+  soundEnabled = true,
+  onToggleSound,
   onToggleTheme,
-  onCloseReader,
-  onDownloadUnreadBundle,
+  onNavigateHome,
+  onNavigateTonight,
+  onNavigateExplore,
+  onNavigateJournal,
   onOpenExternalModal,
   onOpenProfileModal,
   authUser,
   syncStatus,
   onSignIn
 }) {
-  const firstName = authUser?.displayName?.split(' ')[0] || authUser?.email?.split('@')[0] || 'Me';
+  const firstName =
+    authUser?.displayName?.split(' ')[0] || authUser?.email?.split('@')[0] || 'Account';
+  const isExploreActive =
+    currentView === 'choose-type' ||
+    currentView === 'choose-genre' ||
+    currentView === 'shelf';
+
+  const isLitToday = Boolean(streakStats.completedToday);
+  const isFrozenSaved = streakStats.streakState === 'frozen_saved';
+  const isAtRisk = streakStats.streakState === 'at_risk';
+
+  const pillStateClass = isLitToday
+    ? 'is-lit-today'
+    : isFrozenSaved
+    ? 'is-frozen-saved'
+    : isAtRisk
+    ? 'is-at-risk'
+    : 'is-unlit';
+
+  const streakTooltip = isLitToday
+    ? `${streakStats.litFlameStreak}-day streak lit today! (${streakStats.todayCount}/3 toward Gold Night)`
+    : isFrozenSaved
+    ? `Streak Freeze saved your ${streakStats.litFlameStreak}-day streak! Read 1 work tonight to keep it going.`
+    : isAtRisk
+    ? `Your ${streakStats.litFlameStreak}-day streak is unlit today — read 1 work before midnight!`
+    : 'Start your daily reading streak tonight!';
+
   return (
     <header className="masthead" role="banner">
       <div className="masthead-inner">
@@ -34,71 +66,109 @@ export default function TopBar({
             type="button"
             className="brand-title-btn"
             id="brand-home-link"
-            onClick={onCloseReader}
+            onClick={onNavigateHome}
             aria-label="Bradbury 1000 Home"
           >
             <span className="brand-title">Bradbury 1000</span>
           </button>
-          <span className="brand-subtitle hide-on-mobile">
-            Poem • Short Story • Essay • Personal (Korea &amp; SF)
-          </span>
+
+          <nav className="desktop-masthead-nav hide-on-mobile" aria-label="Main sections">
+            <button
+              type="button"
+              id="nav-desktop-home"
+              className={`desktop-nav-link ${currentView === 'home' ? 'active' : ''}`}
+              onClick={onNavigateHome}
+            >
+              Ritual
+            </button>
+            <button
+              type="button"
+              id="nav-desktop-tonight"
+              className={`desktop-nav-link ${currentView === 'tonight' ? 'active' : ''}`}
+              onClick={onNavigateTonight}
+            >
+              Tonight&rsquo;s Four
+            </button>
+            <button
+              type="button"
+              id="nav-desktop-explore"
+              className={`desktop-nav-link ${isExploreActive ? 'active' : ''}`}
+              onClick={onNavigateExplore}
+            >
+              Type &amp; Genre
+            </button>
+            <button
+              type="button"
+              id="nav-desktop-journal"
+              className={`desktop-nav-link ${currentView === 'journal' ? 'active' : ''}`}
+              onClick={onNavigateJournal}
+            >
+              Ledger
+            </button>
+          </nav>
         </div>
 
-        {/* Compact 2-Tier Duolingo Streak Strip + Quick Actions */}
         <div className="streak-cluster">
-          <div
-            className="streak-pill flame"
-            title="Lit Flame Streak: Complete at least 1 reading to keep your daily flame lit"
-            aria-label={`${streakStats.litFlameStreak} day flame streak`}
-          >
-            <Flame size={14} className="streak-icon" />
-            <span className="streak-val">{streakStats.litFlameStreak}</span>
-            <span className="streak-label hide-on-mobile">Flame Streak</span>
-          </div>
-
-          <div
-            className="streak-pill gold"
-            title="Gold Bradbury Nights: Every 3 completed readings earns a Gold Night toward 1,000"
-            aria-label={`${streakStats.goldNights} of 1000 Gold Nights`}
-          >
-            <Award size={13} className="streak-icon" />
-            <span className="streak-val">{streakStats.goldNights}</span>
-            <span className="streak-label hide-on-mobile">/ 1000 Gold</span>
-          </div>
-
-          <div
-            className="streak-pill freeze"
-            title="Streak Freeze Vault (max 2 held, +1 every 7 Gold Nights)"
-            aria-label={`${streakStats.freezeTokens} of ${streakStats.maxFreezeTokens} Streak Freezes`}
-          >
-            <Snowflake size={12} className="streak-icon" />
-            <span className="streak-val">
-              {streakStats.freezeTokens}/{streakStats.maxFreezeTokens}
-            </span>
-            <span className="streak-label hide-on-mobile">Freezes</span>
-          </div>
-
           <button
             type="button"
-            id="bundle-next-quartet-btn"
-            className="btn-secondary hide-on-mobile"
-            onClick={onDownloadUnreadBundle}
-            title="Bundle your next unread Poem, Short Story, Essay & Personal Story into one .epub for ElevenReader"
+            id="topbar-ledger-btn"
+            key={`streak-${streakStats.litFlameStreak}-${isLitToday ? 'lit' : 'dim'}`}
+            className={`streak-ledger-pill ${pillStateClass}`}
+            onClick={onNavigateJournal}
+            title={streakTooltip}
+            aria-label={`${streakStats.litFlameStreak}-day streak (${
+              isLitToday ? 'lit today' : 'unlit today'
+            }), ${streakStats.goldNights} Gold Nights. Open ledger.`}
           >
-            <Download size={14} />
-            <span>Bundle Quartet (.epub)</span>
+            <span className={`ledger-pill-part ${isFrozenSaved ? 'freeze' : isLitToday ? 'flame-lit' : 'flame-unlit'}`}>
+              {isFrozenSaved ? (
+                <Snowflake size={14} />
+              ) : (
+                <Flame
+                  size={14}
+                  fill={isLitToday ? 'currentColor' : 'none'}
+                  strokeWidth={isLitToday ? 2.2 : 1.9}
+                  className={isLitToday ? 'topbar-flame-icon lit' : 'topbar-flame-icon'}
+                />
+              )}
+              <span>{streakStats.litFlameStreak}</span>
+            </span>
+            <span className="ledger-pill-divider" aria-hidden="true">
+              •
+            </span>
+            <span className="ledger-pill-part gold">
+              <Award size={13} />
+              <span>{streakStats.goldNights}</span>
+              <span className="hide-on-mobile">Gold</span>
+            </span>
           </button>
 
           <button
             type="button"
             id="log-external-book-btn"
-            className="icon-btn touch-target"
+            className="icon-btn touch-target hide-on-mobile"
             onClick={onOpenExternalModal}
             title="Log an external book or story"
             aria-label="Log external book"
           >
-            <PlusCircle size={16} />
-            <span className="hide-on-mobile">Log Book</span>
+            <PlusCircle size={15} />
+            <span>Log Book</span>
+          </button>
+
+          <button
+            type="button"
+            id="sound-toggle-btn"
+            className="icon-btn touch-target"
+            onClick={onToggleSound}
+            title={
+              soundEnabled
+                ? 'Celebration sounds ON (click to mute)'
+                : 'Celebration sounds MUTED (click to unmute)'
+            }
+            aria-label={soundEnabled ? 'Mute celebration sounds' : 'Unmute celebration sounds'}
+            aria-pressed={soundEnabled}
+          >
+            {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
           </button>
 
           <button
@@ -106,7 +176,7 @@ export default function TopBar({
             id="theme-toggle-btn"
             className="icon-btn touch-target"
             onClick={onToggleTheme}
-            title="Toggle Reading Theme (Parchment / Sepia / Nocturnal)"
+            title="Toggle Reading Theme (Parchment / Nocturnal)"
             aria-label="Toggle reading theme"
           >
             {theme === 'nocturnal' ? <Sun size={16} /> : <Moon size={16} />}
@@ -116,12 +186,13 @@ export default function TopBar({
             <button
               type="button"
               id="sign-in-btn"
-              className="btn-secondary touch-target"
+              className="icon-btn touch-target sign-in-compact-btn"
               onClick={onSignIn}
               title="Sign in with Google to sync your progress across devices"
+              aria-label="Sign in"
             >
               <LogIn size={15} />
-              <span>Sign in</span>
+              <span className="sign-in-label">Sign in</span>
             </button>
           ) : (
             <button
@@ -131,13 +202,20 @@ export default function TopBar({
               onClick={onOpenProfileModal}
               title={
                 authUser
-                  ? `Signed in as ${authUser.email} — ${syncStatus === 'error' ? 'sync problem' : 'progress synced'}`
+                  ? `Signed in as ${authUser.email} — ${
+                      syncStatus === 'error' ? 'sync problem' : 'progress synced'
+                    }`
                   : 'Profile & settings'
               }
               aria-label="Account and settings"
             >
               {authUser?.photoURL ? (
-                <img src={authUser.photoURL} alt="" className="avatar-img" referrerPolicy="no-referrer" />
+                <img
+                  src={authUser.photoURL}
+                  alt=""
+                  className="avatar-img"
+                  referrerPolicy="no-referrer"
+                />
               ) : (
                 <User size={16} />
               )}
