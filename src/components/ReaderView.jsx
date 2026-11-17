@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft,
+  ArrowRight,
   Headphones,
   Download,
   ExternalLink,
@@ -38,8 +39,11 @@ export default function ReaderView({
   activeReader,
   isCompleted,
   profile,
+  seriesNav = null,
   onUpdateProfile,
   onCloseReader,
+  onOpenReader,
+  onSelectSeries,
   onShareElevenReader,
   onDownloadEpub,
   onToggleComplete
@@ -270,7 +274,21 @@ export default function ReaderView({
 
       <article>
         <div className="reader-kicker">
-          {slotLabel} • {item.genre || item.category}
+          {seriesNav && onSelectSeries ? (
+            <button
+              type="button"
+              id="reader-series-pill-btn"
+              className="reader-series-pill"
+              onClick={() => onSelectSeries(seriesNav.seriesId)}
+            >
+              {item.seriesTitle} •{' '}
+              {item.seriesOrder === 0 ? 'Overview' : `Episode ${item.seriesOrder} of ${seriesNav.total}`}
+            </button>
+          ) : (
+            <>
+              {slotLabel} • {item.genre || item.category}
+            </>
+          )}
         </div>
         <h1 className="reader-title">{item.title}</h1>
         <p className="reader-byline">
@@ -283,7 +301,8 @@ export default function ReaderView({
               <strong>{item.region}</strong> — {item.subtitle} ({item.era} • {item.location})
             </>
           )}{' '}
-          • {item.readingTimeMinutes} min read
+          • {item.audioDurationMinutes || item.readingTimeMinutes} min{' '}
+          {item.categoryKey === 'personal' ? 'listen' : 'read'}
         </p>
 
         {item.epigraph && <blockquote className="reader-epigraph">{item.epigraph}</blockquote>}
@@ -472,6 +491,40 @@ export default function ReaderView({
             </span>
           </button>
         </div>
+
+        {seriesNav?.nextItem && onOpenReader && (
+          <div className="reader-series-next-card" id="reader-series-next-card">
+            <div className="reader-series-next-copy">
+              <span className="reader-series-next-eyebrow">
+                Up Next in {item.seriesTitle}
+              </span>
+              <strong>
+                {seriesNav.nextItem.seriesOrder === 0
+                  ? 'Overview: '
+                  : `Episode ${seriesNav.nextItem.seriesOrder}: `}
+                {seriesNav.nextItem.title}
+              </strong>
+              <span className="reader-series-next-meta">
+                {seriesNav.nextItem.audioDurationMinutes || seriesNav.nextItem.readingTimeMinutes}{' '}
+                min listen
+              </span>
+            </div>
+            <button
+              type="button"
+              id="reader-next-episode-btn"
+              className="btn-secondary"
+              onClick={() => {
+                if (!isCompleted) {
+                  onToggleComplete(item);
+                }
+                onOpenReader(seriesNav.nextItem);
+              }}
+            >
+              <span>Next Episode</span>
+              <ArrowRight size={15} />
+            </button>
+          </div>
+        )}
       </article>
 
       {/* Fixed Thumb-Zone Mobile Reader Action Bar */}

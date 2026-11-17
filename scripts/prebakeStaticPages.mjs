@@ -7,6 +7,7 @@ const rootDir = path.resolve(__dirname, '..');
 
 const poemsAndEssaysPath = path.join(rootDir, 'src/data/poemsAndEssays.json');
 const storiesAndPlacesPath = path.join(rootDir, 'src/data/storiesAndPlaces.json');
+const narrativeSeriesPath = path.join(rootDir, 'src/data/narrativeSeries.json');
 
 if (!fs.existsSync(poemsAndEssaysPath) || !fs.existsSync(storiesAndPlacesPath)) {
   console.log('Data files not yet present; skipping static reader page generation.');
@@ -15,6 +16,9 @@ if (!fs.existsSync(poemsAndEssaysPath) || !fs.existsSync(storiesAndPlacesPath)) 
 
 const poemsAndEssays = JSON.parse(fs.readFileSync(poemsAndEssaysPath, 'utf8'));
 const storiesAndPlaces = JSON.parse(fs.readFileSync(storiesAndPlacesPath, 'utf8'));
+const narrativeSeries = fs.existsSync(narrativeSeriesPath)
+  ? JSON.parse(fs.readFileSync(narrativeSeriesPath, 'utf8'))
+  : { items: [] };
 
 function escapeHtml(str = '') {
   return String(str)
@@ -24,13 +28,17 @@ function escapeHtml(str = '') {
     .replace(/"/g, '&quot;');
 }
 
-function renderStaticArticleHtml({ night, slotKey, slotLabel, item }) {
+function formatRichHtml(str = '') {
+  return escapeHtml(str).replace(/\*([^*]+)\*/g, '<em>$1</em>');
+}
+
+function renderStaticArticleHtml({ night, slotKey, slotLabel, item, appHref = null }) {
   let bodyContent = '';
   if (Array.isArray(item.fullText)) {
     bodyContent = item.fullText
       .map(
         (stanza) =>
-          `<div class="stanza">${escapeHtml(stanza)
+          `<div class="stanza">${formatRichHtml(stanza)
             .split('\n')
             .map((l) => `<p class="poem-line">${l}</p>`)
             .join('')}</div>`
@@ -41,14 +49,14 @@ function renderStaticArticleHtml({ night, slotKey, slotLabel, item }) {
       .split(/\n\s*\n/)
       .map(
         (stanza) =>
-          `<div class="stanza">${escapeHtml(stanza)
+          `<div class="stanza">${formatRichHtml(stanza)
             .split('\n')
             .map((l) => `<p class="poem-line">${l}</p>`)
             .join('')}</div>`
       )
       .join('\n');
   } else if (Array.isArray(item.paragraphs)) {
-    bodyContent = item.paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join('\n');
+    bodyContent = item.paragraphs.map((p) => `<p>${formatRichHtml(p)}</p>`).join('\n');
   }
 
   const analysisContent = Array.isArray(item.analysis)
@@ -61,7 +69,7 @@ function renderStaticArticleHtml({ night, slotKey, slotLabel, item }) {
           (sec) => `
         <div class="analysis-item">
           <h3>${escapeHtml(sec.heading)}</h3>
-          ${String(sec.paragraph).split(/\n\s*\n/).map((para) => `<p>${escapeHtml(para)}</p>`).join('')}
+          ${String(sec.paragraph).split(/\n\s*\n/).map((para) => `<p>${formatRichHtml(para)}</p>`).join('')}
         </div>`
         )
         .join('\n')}
@@ -189,7 +197,7 @@ function renderStaticArticleHtml({ night, slotKey, slotLabel, item }) {
 <body>
   <main>
     <div class="nav-back">
-      <a href="/#/read/day-${night}/${slotKey}">← Open in Bradbury 1000 Interactive App</a>
+      <a href="${appHref || `/#/read/day-${night}/${slotKey}`}">← Open in Bradbury 1000 Interactive App</a>
       <span>ElevenReader Clean Import View</span>
     </div>
     <article>
@@ -248,5 +256,26 @@ for (let n = 1; n <= 100; n++) {
   }
 }
 
-console.log(`Pre-baked ${count} distraction-free static reader pages under public/read/day-1..100/`);
+let seriesCount = 0;
+for (const item of narrativeSeries.items || []) {
+  if (!item?.id) continue;
+  const outDir = path.join(rootDir, 'public', 'read', 'series', item.id);
+  fs.mkdirSync(outDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(outDir, 'index.html'),
+    renderStaticArticleHtml({
+      night: null,
+      slotKey: 'personal',
+      slotLabel: item.seriesTitle || `${item.region || 'Historical'} Deep-Dive`,
+      item,
+      appHref: `/#/read/series/${encodeURIComponent(item.id)}`
+    }),
+    'utf8'
+  );
+  seriesCount++;
+}
+
+console.log(
+  `Pre-baked ${count} day-1..100 pages + ${seriesCount} series pages (${count + seriesCount} total) under public/read/`
+);
 

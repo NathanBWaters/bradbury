@@ -1,9 +1,8 @@
 /**
- * Bradbury 1000 — Offline-Capable Service Worker (Stale-While-Revalidate + App Shell Cache)
- * Ensures all 62 pre-baked readings (14 Poems, 14 Stories, 14 Essays, 20 Korea/SF Chronicles)
- * and static /read/day-* pages work seamlessly offline.
+ * Bradbury 1000 — Offline-Capable Service Worker (Network-First Navigations + Stale-While-Revalidate Assets)
+ * Ensures all 442 works and static /read/day-* + /read/series/* pages work seamlessly offline.
  */
-const CACHE_NAME = 'bradbury-1000-pwa-v5';
+const CACHE_NAME = 'bradbury-1000-pwa-v6';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
@@ -62,7 +61,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Stale-While-Revalidate for app shell, built assets, icons, and /read/* static pages
+  // Network-First for HTML navigation requests so deploys deliver fresh index.html immediately
+  if (request.mode === 'navigate' || request.destination === 'document') {
+    event.respondWith(
+      fetch(request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(request).then((hit) => hit || caches.match('/index.html')))
+    );
+    return;
+  }
+
+  // Stale-While-Revalidate for hashed static assets, icons, and offline subresources
   event.respondWith(
     caches.open(CACHE_NAME).then((cache) =>
       cache.match(request).then((cachedResponse) => {

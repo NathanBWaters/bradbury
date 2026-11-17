@@ -18,6 +18,9 @@ export default defineConfig({
           if (id.includes('storiesAndPlaces.json')) {
             return 'catalog-stories-places';
           }
+          if (id.includes('narrativeSeries.json')) {
+            return 'catalog-narrative-series';
+          }
         }
       }
     }

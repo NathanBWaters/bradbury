@@ -18,6 +18,8 @@ function sleep(ms) {
 function findChromiumBinary() {
   const candidates = [
     process.env.CHROMIUM_BIN,
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/Applications/Chromium.app/Contents/MacOS/Chromium',
     '/usr/bin/chromium',
     '/usr/bin/chromium-browser',
     '/usr/bin/google-chrome',
@@ -400,20 +402,46 @@ async function runFunnelTests(tag = 'funnel') {
     await sleep(400);
     assert.equal(await cdp.eval(`location.pathname`), '/choose', 'Reader Back after search must return cleanly to /choose');
 
-    // Step into Personal (/choose/personal) -> verify 2 Places + 5 Cross-Pacific Themes
+    // Step into Personal (/choose/personal) -> verify 3 Series + 3 Places + 5 Cross-Pacific Themes
     await cdp.eval(`document.getElementById('choose-type-personal').click()`);
     await sleep(400);
-    await assertCleanMobilePage(cdp, 'Choose Personal Place/Theme (/choose/personal)');
+    await assertCleanMobilePage(cdp, 'Choose Personal Series/Place/Theme (/choose/personal)');
     const personalGenreInfo = await cdp.eval(`(() => ({
       pathname: location.pathname,
+      seriesCount: document.querySelectorAll('.series-choice-card').length,
       regionCount: document.querySelectorAll('.region-choice-card').length,
       themeCount: document.querySelectorAll('.genre-choice-card').length
     }))()`);
-    console.log('4b. Choose Personal Place/Theme Step:', JSON.stringify(personalGenreInfo));
+    console.log('4b. Choose Personal Series/Place/Theme Step:', JSON.stringify(personalGenreInfo));
     assert.equal(personalGenreInfo.pathname, '/choose/personal');
-    assert.equal(personalGenreInfo.regionCount, 2);
+    assert.equal(personalGenreInfo.seriesCount, 3);
+    assert.equal(personalGenreInfo.regionCount, 3);
     assert.equal(personalGenreInfo.themeCount, 5);
     await cdp.screenshot(`/tmp/${tag}_mobile_choose_personal.png`);
+
+    // Select Korean Presidents ordered series -> verify 17 ordered episodes & Next Episode navigation
+    await cdp.eval(`document.getElementById('choose-genre-korean-presidents').click()`);
+    await sleep(400);
+    await assertCleanMobilePage(cdp, 'Korean Presidents Series (/personal?genre=korean-presidents)');
+    const krPresShelf = await cdp.eval(`(() => ({
+      url: location.pathname + location.search,
+      unreadCount: document.querySelectorAll('#unread-options-grid .slot-card').length,
+      firstId: document.querySelector('#unread-options-grid .slot-card')?.dataset?.testid
+    }))()`);
+    console.log('4b-ii. Korean Presidents Series Shelf:', JSON.stringify(krPresShelf));
+    assert.equal(krPresShelf.url, '/personal?genre=korean-presidents');
+    assert.equal(krPresShelf.unreadCount, 17, 'Korean Presidents shelf must list all 17 episodes');
+    assert.equal(krPresShelf.firstId, 'reading-card-kr-pres-0', 'Overview must sit first');
+
+    await cdp.eval(`document.querySelector('[data-testid="reading-card-kr-pres-0"] .card-read-btn').click()`);
+    await sleep(400);
+    await assertCleanMobilePage(cdp, 'Series Reader View (/personal/kr-pres-0)');
+    const hasNextBtn = await cdp.eval(`Boolean(document.getElementById('reader-next-episode-btn'))`);
+    assert.equal(hasNextBtn, true, 'Reader must show Next Episode CTA inside ordered series');
+    await cdp.eval(`history.back()`);
+    await sleep(350);
+    await cdp.eval(`history.back()`);
+    await sleep(350);
 
     // Select Korea -> Focused Shelf (/personal?genre=Korea)
     await cdp.eval(`document.getElementById('choose-genre-korea').click()`);
@@ -425,7 +453,7 @@ async function runFunnelTests(tag = 'funnel') {
     }))()`);
     console.log('4c. Korea Focused Shelf:', JSON.stringify(koreaShelf));
     assert.equal(koreaShelf.url, '/personal?genre=Korea');
-    assert.equal(koreaShelf.unreadCount, 50, 'Korea shelf must show 50 unread Korea chronicles');
+    assert.equal(koreaShelf.unreadCount, 69, 'Korea shelf must show 69 unread Korea chronicles & episodes');
 
     // Test browser Back button steps cleanly back through /choose/personal -> /choose
     await cdp.eval(`history.back()`);

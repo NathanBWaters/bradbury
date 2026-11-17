@@ -63,21 +63,28 @@ const poemsAndEssays = JSON.parse(
 const storiesAndPlaces = JSON.parse(
   fs.readFileSync(path.join(__dirname, '../../src/data/storiesAndPlaces.json'), 'utf8')
 );
+const narrativeSeries = JSON.parse(
+  fs.readFileSync(path.join(__dirname, '../../src/data/narrativeSeries.json'), 'utf8')
+);
 
 describe('Bradbury 1000 — Catalog Engine & Subcategory Partitioning', () => {
-  const catalog = buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces);
+  const catalog = buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces, narrativeSeries);
 
-  it('normalizes all 400 literary & personal works across the 4 pillars (100 each)', () => {
+  it('normalizes all 442 literary, personal & series works across the 4 pillars', () => {
     assert.equal(catalog.poem.length, 100, 'Should have 100 poems');
     assert.equal(catalog.story.length, 100, 'Should have 100 short stories');
     assert.equal(catalog.essay.length, 100, 'Should have 100 essays');
-    assert.equal(catalog.personal.length, 100, 'Should have 100 personal essays (50 Korea + 50 SF)');
+    assert.equal(
+      catalog.personal.length,
+      142,
+      'Should have 142 personal & series essays (69 Korea + 50 SF + 23 US)'
+    );
     const total =
       catalog.poem.length +
       catalog.story.length +
       catalog.essay.length +
       catalog.personal.length;
-    assert.equal(total, 400, 'Total catalog should contain 400 works');
+    assert.equal(total, 442, 'Total catalog should contain 442 works');
   });
 
   it('extracts genre subcategories with All first and item counts for each category', () => {
@@ -158,11 +165,46 @@ describe('Bradbury 1000 — Catalog Engine & Subcategory Partitioning', () => {
 
     const personalSubcats = getSubcategoriesForCategory(catalog, 'personal');
     assert.equal(personalSubcats[0].id, 'All');
-    assert.equal(personalSubcats[1].id, 'Korea');
-    assert.equal(personalSubcats[1].count, 50);
-    assert.equal(personalSubcats[2].id, 'San Francisco');
-    assert.equal(personalSubcats[2].count, 50);
-    assert.equal(personalSubcats.length, 8, 'Personal should have All + 2 places + 5 cross-Pacific themes');
+    assert.equal(personalSubcats[1].id, 'korean-presidents');
+    assert.equal(personalSubcats[1].count, 17);
+    assert.equal(personalSubcats[2].id, 'us-presidents');
+    assert.equal(personalSubcats[2].count, 23);
+    assert.equal(personalSubcats[3].id, 'modern-korea-epics');
+    assert.equal(personalSubcats[3].count, 3);
+    assert.equal(personalSubcats[4].id, 'Korea');
+    assert.equal(personalSubcats[4].count, 69);
+    assert.equal(personalSubcats[5].id, 'San Francisco');
+    assert.equal(personalSubcats[5].count, 50);
+    assert.equal(personalSubcats[6].id, 'United States');
+    assert.equal(personalSubcats[6].count, 23);
+    assert.equal(
+      personalSubcats.length,
+      12,
+      'Personal should have All + 3 series + 3 places + 5 cross-Pacific themes'
+    );
+
+    const krSeries = filterAndPartitionItems(catalog, 'personal', 'korean-presidents', {}).unreadItems;
+    assert.equal(krSeries.length, 17);
+    assert.deepEqual(
+      krSeries.map((i) => i.seriesOrder),
+      Array.from({ length: 17 }, (_, idx) => idx),
+      'Korean presidents series must stay strictly in seriesOrder 0..16'
+    );
+
+    const usSeries = filterAndPartitionItems(catalog, 'personal', 'us-presidents', {}).unreadItems;
+    assert.equal(usSeries.length, 23);
+    assert.deepEqual(
+      usSeries.map((i) => i.seriesOrder),
+      Array.from({ length: 23 }, (_, idx) => idx),
+      'US presidents series must stay strictly in seriesOrder 0..22'
+    );
+
+    const krEpics = filterAndPartitionItems(catalog, 'personal', 'modern-korea-epics', {}).unreadItems;
+    assert.deepEqual(
+      krEpics.map((i) => i.id),
+      ['kr-epic-1', 'korea-50', 'kr-epic-3'],
+      'Modern Korea Deep-Dives must be ordered Korean War -> Semiconductors -> K-Pop'
+    );
 
     const themePartition = filterAndPartitionItems(
       catalog,
@@ -200,7 +242,7 @@ describe('Bradbury 1000 — Catalog Engine & Subcategory Partitioning', () => {
 });
 
 describe('Bradbury 1000 — ElevenReader Plain-Text Share Formatter', () => {
-  const catalog = buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces);
+  const catalog = buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces, narrativeSeries);
 
   it('formats full unabridged literary text + 5-paragraph analysis for ElevenReader', () => {
     const story = catalog.story[0];
@@ -221,15 +263,38 @@ describe('Bradbury 1000 — ElevenReader Plain-Text Share Formatter', () => {
     }
   });
 
-  it('includes Primary & Historical Sources for Korea & San Francisco personal dispatches', () => {
-    const personalItem = catalog.personal[0];
+  it('formats spoiler-free audio text without Key Context or default sources on personal dispatches', () => {
+    const personalItem = catalog.personal.find((x) => x.id === 'kr-pres-5') || catalog.personal[0];
     const formatted = formatFullPlainTextForElevenReader(personalItem);
 
-    assert.ok(
-      formatted.includes('Primary and Historical Sources:'),
-      'Personal dispatches must include historical sources in ElevenReader share text'
+    assert.equal(
+      formatted.includes('Key Context & Why It Matters:'),
+      false,
+      'Spoken ElevenReader audio for personal essays must not spoil openings with Key Context'
     );
-    assert.ok(formatted.includes(personalItem.sources[0].title));
+    assert.equal(
+      formatted.includes('---'),
+      false,
+      'Spoken ElevenReader text for personal essays must omit horizontal rule punctuation'
+    );
+    assert.ok(
+      formatted.includes('Post-Story Historical Analysis'),
+      'Personal dispatches must include spoken analysis section transition'
+    );
+    assert.equal(
+      formatted.includes('Primary and Historical Sources:'),
+      false,
+      'Spoken ElevenReader text omits source bibliography by default'
+    );
+
+    const withSources = formatFullPlainTextForElevenReader(personalItem, true, {
+      includeSources: true
+    });
+    assert.ok(
+      withSources.includes('Primary and Historical Sources:'),
+      'Explicit includeSources option preserves bibliography in share text'
+    );
+    assert.ok(withSources.includes(personalItem.sources[0].title));
   });
 
   it('returns empty string safely on null or undefined item', () => {
@@ -251,12 +316,12 @@ describe('Bradbury 1000 — ElevenReader Plain-Text Share Formatter', () => {
     );
     assert.equal(partitioned.completedCategoryItems.length, 1);
     assert.equal(partitioned.completedCategoryItems[0].id, targetItem.id);
-    assert.equal(partitioned.unreadItems.length, 99);
+    assert.equal(partitioned.unreadItems.length, 141);
   });
 });
 
 describe('Bradbury 1000 — Spec-Compliant Pure-JS EPUB 2/3 Generator', () => {
-  const catalog = buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces);
+  const catalog = buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces, narrativeSeries);
 
   it('generates a valid EPUB ZIP Blob with uncompressed mimetype first', async () => {
     const sample = catalog.poem[0];
@@ -427,8 +492,8 @@ describe('Bradbury 1000 — Authentic Duolingo Calendar-Day Streak Engine & Soun
   });
 });
 
-describe('Bradbury 1000 — Dataset Verbatim, Key Context & Single-Text Analysis Integrity (400 Works)', () => {
-  const catalog = buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces);
+describe('Bradbury 1000 — Dataset Verbatim, Key Context & Single-Text Analysis Integrity (442 Works)', () => {
+  const catalog = buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces, narrativeSeries);
   const allWorks = [
     ...catalog.poem,
     ...catalog.story,
@@ -436,8 +501,8 @@ describe('Bradbury 1000 — Dataset Verbatim, Key Context & Single-Text Analysis
     ...catalog.personal
   ];
 
-  it('verifies all 400 works have complete text, Key Context briefing, and focused single-text analysis (6-section deep dive for literature, 4 sections for Personal) without bundle wrap-ups', () => {
-    assert.equal(allWorks.length, 400);
+  it('verifies all 442 works have complete text, Key Context briefing, and focused single-text analysis without bundle wrap-ups', () => {
+    assert.equal(allWorks.length, 442);
     const forbiddenBundleRx =
       /\b(Metaphor\s+Collision|Bradbury\s+Collision|Night\s+\d+|side\s+by\s+side\s+with\s+classic|Pairing\s+this\s+Night|tonight's\s+poem|tonight's\s+short\s+story|tonight's\s+essay|reading\s+sequence)\b/i;
 
@@ -503,8 +568,10 @@ describe('Bradbury 1000 — Dataset Verbatim, Key Context & Single-Text Analysis
     }
   });
 
-  it('verifies all 100 Personal (50 Korea + 50 San Francisco) dispatches include 4 verified historical sources', () => {
-    assert.equal(catalog.personal.length, 100);
+  it('verifies all 142 Personal & Series dispatches include >=4 verified sources and zero boilerplate or TTS hazards', () => {
+    assert.equal(catalog.personal.length, 142);
+    const forbiddenBoilerplate =
+      /field historians and architectural conservators|hum of Muni buses|equips any traveler or reader|empirical data validated centuries/i;
     for (const item of catalog.personal) {
       assert.ok(Array.isArray(item.sources), `Missing sources array on ${item.id}`);
       assert.ok(
@@ -517,31 +584,50 @@ describe('Bradbury 1000 — Dataset Verbatim, Key Context & Single-Text Analysis
           `Incomplete source metadata on ${item.id}`
         );
       }
+      const joined = [item.keyContext, ...(item.paragraphs || []), ...(item.analysis || []).map((a) => a.paragraph)].join('\n');
+      assert.equal(
+        forbiddenBoilerplate.test(joined),
+        false,
+        `Boilerplate phrasing remained on ${item.id}`
+      );
+      assert.equal(
+        /[\u3131-\uD79D\u4E00-\u9FFF]/.test(joined),
+        false,
+        `CJK/Hangul TTS hazard remained on ${item.id}`
+      );
+      assert.equal(
+        /\(\s*\d+\.\d+°\s*[NSEW]/i.test(joined),
+        false,
+        `GPS coordinate hazard remained on ${item.id}`
+      );
     }
   });
 
-  it('enforces the 20-Minute Audio Rule (~3,000 words at 150 WPM) on all 100 Personal (50 Korea & 50 SF) stories', () => {
-    assert.equal(PERSONAL_STORY_AUDIO_RULE.targetAudioMinutes, 20);
+  it('enforces Topic-Calibrated Audio Metrics at 150 WPM across all 142 Personal & Series works', () => {
+    assert.equal(PERSONAL_STORY_AUDIO_RULE.speakingRateWpm, 150);
     for (const item of catalog.personal) {
       const metrics = computeStoryAudioMetrics(item);
       assert.ok(
         metrics.bodyWords >= PERSONAL_STORY_AUDIO_RULE.minBodyWords,
-        `Personal story ${item.id} (${item.title}) bodyWords (${metrics.bodyWords}) must be >= ${PERSONAL_STORY_AUDIO_RULE.minBodyWords}`
+        `Personal story ${item.id} bodyWords (${metrics.bodyWords}) must be >= ${PERSONAL_STORY_AUDIO_RULE.minBodyWords}`
       );
       assert.ok(
         metrics.totalWords >= PERSONAL_STORY_AUDIO_RULE.minTotalWords,
-        `Personal story ${item.id} (${item.title}) totalWords (${metrics.totalWords}) must be >= ${PERSONAL_STORY_AUDIO_RULE.minTotalWords} (~20 min audio at 150 WPM)`
+        `Personal story ${item.id} totalWords (${metrics.totalWords}) must be >= ${PERSONAL_STORY_AUDIO_RULE.minTotalWords}`
       );
-      assert.ok(
-        metrics.estimatedAudioMinutes >= PERSONAL_STORY_AUDIO_RULE.minAudioMinutes &&
-          metrics.estimatedAudioMinutes <= PERSONAL_STORY_AUDIO_RULE.maxAudioMinutes,
-        `Personal story ${item.id} estimatedAudioMinutes (${metrics.estimatedAudioMinutes}m) must be between ${PERSONAL_STORY_AUDIO_RULE.minAudioMinutes}m and ${PERSONAL_STORY_AUDIO_RULE.maxAudioMinutes}m`
-      );
+      const expectedMins = Math.max(6, Math.round(metrics.totalWords / PERSONAL_STORY_AUDIO_RULE.speakingRateWpm));
       assert.equal(
         item.readingTimeMinutes,
-        20,
-        `Personal story ${item.id} readingTimeMinutes must be 20`
+        expectedMins,
+        `Personal story ${item.id} readingTimeMinutes (${item.readingTimeMinutes}) must equal 150 WPM rounded estimate (${expectedMins})`
       );
+      if (item.scopeTier && PERSONAL_STORY_AUDIO_RULE.tiers[item.scopeTier]) {
+        const [minT, maxT] = PERSONAL_STORY_AUDIO_RULE.tiers[item.scopeTier];
+        assert.ok(
+          item.audioDurationMinutes >= minT && item.audioDurationMinutes <= maxT,
+          `Series episode ${item.id} (${item.scopeTier}) duration ${item.audioDurationMinutes}m must sit within [${minT}..${maxT}]`
+        );
+      }
     }
   });
 });
@@ -549,7 +635,7 @@ describe('Bradbury 1000 — Dataset Verbatim, Key Context & Single-Text Analysis
 
 
 describe('History-API router (multi-page funnel & per-work URLs)', () => {
-  const catalog = buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces);
+  const catalog = buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces, narrativeSeries);
   const loc = (pathname, search = '', hash = '') => ({ pathname, search, hash });
 
   it('maps root, funnel paths, and genre shelf paths cleanly', () => {
@@ -607,6 +693,16 @@ describe('History-API router (multi-page funnel & per-work URLs)', () => {
     assert.equal(legacy.view, 'reader');
     assert.equal(legacy.item?.categoryKey, 'essay');
     assert.equal(legacy.canonical, itemPath(legacy.item));
+
+    const krSeriesRoute = parseLocation(loc('/read/series/kr-pres-5'), catalog);
+    assert.equal(krSeriesRoute.view, 'reader');
+    assert.equal(krSeriesRoute.item?.id, 'kr-pres-5');
+    assert.equal(krSeriesRoute.canonical, '/personal/kr-pres-5');
+
+    const usHashRoute = parseLocation(loc('/', '', '#/read/series/us-pres-8'), catalog);
+    assert.equal(usHashRoute.view, 'reader');
+    assert.equal(usHashRoute.item?.id, 'us-pres-8');
+    assert.equal(usHashRoute.canonical, '/personal/us-pres-8');
   });
 });
 
@@ -647,20 +743,20 @@ describe('Cross-device progress merge', async () => {
 });
 
 describe('Bradbury 1000 — Title-First Catalog Search Engine', () => {
-  const catalog = buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces);
+  const catalog = buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces, narrativeSeries);
 
   it('normalizes diacritics, curly quotes, and punctuation cleanly', () => {
     assert.equal(normalizeSearchText('  “An Occurrence at Owl’s—Creek!” '), "an occurrence at owl's creek");
   });
 
-  it('returns balanced unread quick-picks and full 400 counts when query is empty', () => {
+  it('returns balanced unread quick-picks and full 442 counts when query is empty', () => {
     const emptyRes = searchCatalog(catalog, '');
     assert.equal(emptyRes.isQueryEmpty, true);
-    assert.equal(emptyRes.countsByCategory.all, 400);
+    assert.equal(emptyRes.countsByCategory.all, 442);
     assert.equal(emptyRes.results.length, 8);
   });
 
-  it('ranks exact and article-stripped title matches #1 across all 400 works', () => {
+  it('ranks exact and article-stripped title matches #1 across all 442 works', () => {
     const targetStory = catalog.story[0];
     const strippedTitle = targetStory.title.replace(/^(The|A|An)\s+/i, '');
     const hit = searchCatalog(catalog, strippedTitle);

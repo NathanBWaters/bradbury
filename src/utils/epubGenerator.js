@@ -110,6 +110,10 @@ function createZipArchive(files) {
   });
 }
 
+function escapeAndFormatHtml(str = '') {
+  return escapeXml(str).replace(/\*([^*]+)\*/g, '<em>$1</em>');
+}
+
 function renderItemBodyHtml(item, slotLabel, includeAnalysis = true) {
   let bodyHtml = '';
 
@@ -117,7 +121,7 @@ function renderItemBodyHtml(item, slotLabel, includeAnalysis = true) {
     bodyHtml = item.fullText
       .map(
         (stanza) =>
-          `<div class="stanza">${escapeXml(stanza)
+          `<div class="stanza">${escapeAndFormatHtml(stanza)
             .split('\n')
             .map((line) => `<p class="poem-line">${line}</p>`)
             .join('')}</div>`
@@ -128,15 +132,15 @@ function renderItemBodyHtml(item, slotLabel, includeAnalysis = true) {
       .split(/\n\s*\n/)
       .map(
         (stanza) =>
-          `<div class="stanza">${escapeXml(stanza)
+          `<div class="stanza">${escapeAndFormatHtml(stanza)
             .split('\n')
-            .map((line) => `<p class="poem-line">${line}</p>`)
+            .map((l) => `<p class="poem-line">${l}</p>`)
             .join('')}</div>`
       )
       .join('\n');
   } else if (Array.isArray(item.paragraphs)) {
     bodyHtml = item.paragraphs
-      .map((p) => `<p class="prose-para">${escapeXml(p)}</p>`)
+      .map((p) => `<p class="prose-para">${escapeAndFormatHtml(p)}</p>`)
       .join('\n');
   }
 
@@ -201,8 +205,10 @@ function renderItemBodyHtml(item, slotLabel, includeAnalysis = true) {
     item.year || item.era || ''
   )}</p>
     <h1>${escapeXml(item.title)}</h1>
-    <p class="byline">By ${escapeXml(item.author || `${item.region} Cultural Chronicle`)}</p>
-    ${item.epigraph ? `<blockquote class="epigraph">${escapeXml(item.epigraph)}</blockquote>` : ''}
+    <p class="byline">${escapeXml(
+      item.author ? `By ${item.author}` : item.seriesTitle || `${item.region || 'Personal'} Cultural Chronicle`
+    )}</p>
+    ${item.epigraph ? `<blockquote class="epigraph">${escapeAndFormatHtml(item.epigraph)}</blockquote>` : ''}
     ${keyContextHtml}
     <div class="content-body">
       ${bodyHtml}

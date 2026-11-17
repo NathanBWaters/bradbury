@@ -26,9 +26,11 @@ export default function HomeFunnelView({
   streakStats,
   unreadCounts,
   nextRecommendation,
+  featuredSeries = [],
   soundEnabled = true,
   onChooseTonightQuartet,
   onChooseCustomPath,
+  onSelectSeries,
   onOpenSurpriseNow,
   onJumpToRecommendation,
   onDownloadUnreadBundle,
@@ -190,7 +192,7 @@ export default function HomeFunnelView({
             <div className="adventure-pillar-pills" aria-hidden="true">
               <span>4 Forms</span>
               <span>20+ Genres</span>
-              <span>Korea &amp; SF</span>
+              <span>Korea, U.S. &amp; SF</span>
             </div>
             <span className="adventure-cta-row">
               <span>Pick Type &amp; Genre</span>
@@ -200,7 +202,7 @@ export default function HomeFunnelView({
 
           <div className="adventure-card-subaction">
             <span className="adventure-subnote">
-              Step-by-step • Poems, Stories, Essays &amp; Place Chronicles
+              Step-by-step • Poems, Stories, Essays &amp; Audio Series
             </span>
           </div>
         </div>
@@ -289,6 +291,36 @@ export default function HomeFunnelView({
 
       {rewards && <DailyQuestsCard rewards={rewards} streakStats={streakStats} />}
 
+      {featuredSeries.length > 0 && onSelectSeries && (
+        <section className="home-series-strip" aria-label="Featured Long-Form Audio Series">
+          <div className="home-ledger-header">
+            <span className="home-ledger-label">Featured Long-Form Audio Series</span>
+            <span className="adventure-subnote">Listen in chronological order</span>
+          </div>
+          <div className="home-series-grid">
+            {featuredSeries.map((ser) => (
+              <button
+                key={ser.id}
+                type="button"
+                id={`home-series-${ser.id}`}
+                className="home-series-card"
+                onClick={() => onSelectSeries(ser.id)}
+              >
+                <div className="home-series-top">
+                  <span className="home-series-region">{ser.region}</span>
+                  <span className="home-series-count">{ser.count} episodes</span>
+                </div>
+                <strong className="home-series-title">{ser.shortLabel || ser.label}</strong>
+                <span className="home-series-cta">
+                  <span>Start Series</span>
+                  <ArrowRight size={13} />
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Quiet Nightly Ledger Summary & Secondary Utilities */}
       <section className="home-ledger-strip" aria-label="Reading progress summary">
         <div className="home-ledger-header">
@@ -315,10 +347,11 @@ export default function HomeFunnelView({
                 : cat.key === 'essay'
                 ? streakStats.essaysDone
                 : streakStats.personalDone;
+            const totalForPillar = streakStats.pillarTotals?.[cat.key] || 100;
             return (
               <div key={cat.key} className="home-pillar-stat">
                 <span className="home-pillar-name">{cat.shortLabel}</span>
-                <span className="home-pillar-count">{doneKey} / 100</span>
+                <span className="home-pillar-count">{doneKey} / {totalForPillar}</span>
               </div>
             );
           })}

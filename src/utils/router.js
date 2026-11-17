@@ -75,6 +75,23 @@ function findLegacyReadItem(catalog, nightStr, slotKey) {
  * Views: 'home' | 'tonight' | 'choose-type' | 'choose-genre' | 'shelf' | 'reader' | 'journal'
  */
 export function parseLocation({ pathname = '/', search = '', hash = '' }, catalog) {
+  const seriesRoute =
+    hash.match(/#\/?read\/series\/([^/?#]+)/i) ||
+    pathname.match(/^\/read\/series\/([^/?#]+)/i);
+  if (seriesRoute) {
+    const targetId = decodeURIComponent(seriesRoute[1]);
+    const found = (catalog.personal || []).find((x) => x.id === targetId);
+    if (found) {
+      return {
+        view: 'reader',
+        categoryKey: found.categoryKey,
+        subcategory: 'All',
+        item: found,
+        canonical: itemPath(found)
+      };
+    }
+  }
+
   const legacy =
     hash.match(/#\/?read\/day-(\d+)\/([a-z]+)/i) ||
     pathname.match(/^\/read\/day-(\d+)\/([a-z]+)/i);

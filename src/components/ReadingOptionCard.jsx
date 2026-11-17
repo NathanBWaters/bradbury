@@ -21,16 +21,29 @@ export default function ReadingOptionCard({
 
   const isKorea = item.region === 'Korea';
   const isSF = item.region === 'San Francisco';
-  const filterTarget = isKorea
-    ? 'Korea'
-    : isSF
-    ? 'San Francisco'
-    : item.genre || item.category;
+  const isUS = item.region === 'United States';
+  const hasSeries = Boolean(item.seriesId);
+  const filterTarget =
+    item.seriesId ||
+    (isKorea
+      ? 'Korea'
+      : isSF
+      ? 'San Francisco'
+      : isUS
+      ? 'United States'
+      : item.genre || item.category);
 
-  const badgeLabel = isKorea
+  const episodeTag =
+    item.seriesOrder === 0 ? 'Overview' : item.seriesOrder != null ? `Ep. ${item.seriesOrder}` : null;
+
+  const badgeLabel = hasSeries
+    ? `${episodeTag ? `${episodeTag} • ` : ''}${isKorea ? 'Korea' : isUS ? 'United States' : item.region}`
+    : isKorea
     ? `Korea • ${item.themeGroup || item.category}`
     : isSF
     ? `San Francisco • ${item.themeGroup || item.category}`
+    : isUS
+    ? `United States • ${item.themeGroup || item.category}`
     : item.genre || item.category;
 
   const previewText =
@@ -46,16 +59,16 @@ export default function ReadingOptionCard({
         <div className="slot-header">
           <button
             type="button"
-            className={`slot-badge ${isKorea ? 'korea' : isSF ? 'sf' : ''}`}
+            className={`slot-badge ${isKorea ? 'korea' : isSF ? 'sf' : isUS ? 'us' : ''}`}
             onClick={() => onSelectGenre && onSelectGenre(filterTarget)}
-            title={`Filter by ${filterTarget}`}
+            title={`Filter by ${item.seriesTitle || filterTarget}`}
           >
             {badgeLabel}
           </button>
 
           <div className="slot-meta-row">
             <Clock size={12} />
-            <span>{item.readingTimeMinutes} min</span>
+            <span>{item.audioDurationMinutes || item.readingTimeMinutes} min</span>
           </div>
         </div>
 

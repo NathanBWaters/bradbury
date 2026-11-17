@@ -5,6 +5,33 @@
  */
 import { computeDuolingoStreak } from './streakEngine.js';
 
+export const SERIES_DEFINITIONS = [
+  {
+    id: 'korean-presidents',
+    title: 'Series: Korean Presidents & Rulers (1900–Present)',
+    shortTitle: 'Korean Presidents (1900–Now)',
+    region: 'Korea',
+    blurb:
+      'Seventeen-part narrative arc from Emperor Gojong and the Shanghai exile cabinet to Park Chung-hee, democratization, impeachment, and Lee Jae-myung.'
+  },
+  {
+    id: 'us-presidents',
+    title: 'Series: U.S. Presidents (1900–Present)',
+    shortTitle: 'U.S. Presidents (1900–Now)',
+    region: 'United States',
+    blurb:
+      'Twenty-three-part audio documentary tracing how the American presidency expanded from McKinley and Roosevelt to Biden and Trump.'
+  },
+  {
+    id: 'modern-korea-epics',
+    title: 'Series: Modern Korea Deep-Dives',
+    shortTitle: 'Modern Korea Epics',
+    region: 'Korea',
+    blurb:
+      'Epic explorations of the Korean War, semiconductor and broadband rise, and the global K-pop hit factory.'
+  }
+];
+
 export const MAIN_CATEGORIES = [
   {
     key: 'poem',
@@ -38,13 +65,13 @@ export const MAIN_CATEGORIES = [
   },
   {
     key: 'personal',
-    label: 'Personal (Korea & SF)',
-    pluralLabel: 'Korea & San Francisco Chronicles',
-    shortLabel: 'Korea & SF',
-    subtitle: 'Korea & SF Lore + Primary Sources',
+    label: 'Chronicles & Series',
+    pluralLabel: 'Chronicles & Presidential Series',
+    shortLabel: 'Chronicles & Series',
+    subtitle: 'Korea, U.S. & SF Deep-Dives',
     description:
-      'Twenty-minute archival narratives exploring the hidden history, craft, and ecology of Korea and San Francisco.',
-    typicalDuration: '20 min'
+      'Audio-first long-form documentaries across Korean Presidents (1900–Present), U.S. Presidents (1900–Present), modern Korea epics, and San Francisco lore.',
+    typicalDuration: '15–32 min'
   }
 ];
 
@@ -74,23 +101,23 @@ export const PERSONAL_THEMES = [
 ];
 
 export function classifyPersonalTheme(item) {
-  const hay = `${item?.category || ''} ${item?.title || ''}`.toLowerCase();
+  const hay = `${item?.category || ''} ${item?.title || ''} ${item?.seriesId || ''}`.toLowerCase();
   if (
-    /(gastronom|food|culinar|tea|gimjang|onggi|yeast|market|paper|metalwork|tavern|celadon|ceramic|string craft|horolog|electronic|cybernetic|computing|cable car|invent)/.test(
+    /(gastronom|food|culinar|tea|gimjang|onggi|yeast|market|paper|metalwork|tavern|celadon|ceramic|string craft|horolog|electronic|cybernetic|computing|semiconductor|broadband|microchip|silicon|cable car|invent)/.test(
       hay
     )
   ) {
     return 'Craft, Food & Innovation';
   }
   if (
-    /(literar|poet|cinema|pansori|jazz|mural|fresco|media art|woodblock|jikji|hangul|bohemia|counterculture|botanical painting|satire|chess)/.test(
+    /(literar|poet|cinema|pansori|jazz|mural|fresco|media art|woodblock|jikji|hangul|bohemia|counterculture|botanical painting|satire|chess|k-pop|idol|music|pop)/.test(
       hay
     )
   ) {
     return 'Arts, Literature & Culture';
   }
   if (
-    /(maritime|admiral|turtle ship|ghost fleet|alcatraz|angel island|immigra|civil rights|harvey milk|emperor norton|labor|diplomacy|epidemiolog|public health|royal archives|dynasty|quake|wartime|military)/.test(
+    /(maritime|admiral|turtle ship|ghost fleet|alcatraz|angel island|immigra|civil rights|harvey milk|emperor norton|labor|diplomacy|epidemiolog|public health|royal archives|dynasty|quake|wartime|military|president|impeach|provisional|korean war|emperor|coup|cold war|white house|constitution)/.test(
       hay
     )
   ) {
@@ -106,7 +133,7 @@ export function classifyPersonalTheme(item) {
   return 'Architecture & Urban Design';
 }
 
-export function buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces) {
+export function buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces, narrativeSeries = null) {
   const poems = (poemsAndEssays?.poems || []).map((p, idx) => ({
     ...p,
     keyContext: p.keyContext || p.analysis?.[0]?.paragraph || '',
@@ -155,7 +182,7 @@ export function buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces) {
       wordCount: k.wordCount || metrics.totalWords,
       audioDurationMinutes: k.audioDurationMinutes || metrics.estimatedAudioMinutes,
       categoryKey: 'personal',
-      slotLabel: 'Korea Deep-Dive',
+      slotLabel: k.seriesTitle || 'Korea Deep-Dive',
       nightNumber: k.night || idx + 1,
       staticUrl: `/read/day-${k.night || idx + 1}/korea`,
       subcategory: `Korea • ${resolvedCategory}`,
@@ -183,13 +210,35 @@ export function buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces) {
     };
   });
 
-  // Interleave Korea and SF 1..50 equally
+  const seriesItems = (narrativeSeries?.items || []).map((item) => {
+    const metrics = computeStoryAudioMetrics(item);
+    const themeGroup = classifyPersonalTheme(item);
+    const resolvedCategory = item.category || themeGroup;
+    const regionLabel = item.region || 'Korea';
+    return {
+      ...item,
+      category: resolvedCategory,
+      themeGroup,
+      keyContext: item.keyContext || item.analysis?.[0]?.paragraph || '',
+      wordCount: item.wordCount || metrics.totalWords,
+      audioDurationMinutes: item.audioDurationMinutes || metrics.estimatedAudioMinutes,
+      categoryKey: 'personal',
+      slotLabel: item.seriesTitle || `${regionLabel} Chronicle`,
+      nightNumber: item.night || null,
+      staticUrl: item.night ? `/read/day-${item.night}/korea` : `/read/series/${item.id}`,
+      subcategory: `${regionLabel} • ${resolvedCategory}`,
+      regionGroup: regionLabel
+    };
+  });
+
+  // Interleave Korea and SF 1..50 equally, then append chronological series items
   const personal = [];
   const maxLen = Math.max(korea.length, sf.length);
   for (let i = 0; i < maxLen; i++) {
     if (korea[i]) personal.push(korea[i]);
     if (sf[i]) personal.push(sf[i]);
   }
+  personal.push(...seriesItems);
 
   return {
     poem: poems,
@@ -235,17 +284,35 @@ export function getSubcategoriesForCategory(
   if (selectedCategory === 'personal') {
     const koreaItems = items.filter((i) => i.region === 'Korea');
     const sfItems = items.filter((i) => i.region === 'San Francisco');
+    const usItems = items.filter((i) => i.region === 'United States');
     const allStats = summarizeGroupItems(items, completedItems);
     const koreaStats = summarizeGroupItems(koreaItems, completedItems);
     const sfStats = summarizeGroupItems(sfItems, completedItems);
+    const usStats = summarizeGroupItems(usItems, completedItems);
+
+    const seriesEntries = SERIES_DEFINITIONS.map((def) => {
+      const group = items
+        .filter((i) => i.seriesId === def.id)
+        .sort((a, b) => (a.seriesOrder ?? 999) - (b.seriesOrder ?? 999));
+      return {
+        id: def.id,
+        label: def.title,
+        shortLabel: def.shortTitle,
+        region: def.region,
+        kind: 'series',
+        blurb: def.blurb,
+        ...summarizeGroupItems(group, completedItems)
+      };
+    }).filter((entry) => entry.count > 0);
 
     const list = [
-      { id: 'All', label: 'All Chronicles', kind: 'all', ...allStats },
+      { id: 'All', label: 'All Chronicles & Series', kind: 'all', ...allStats },
+      ...seriesEntries,
       {
         id: 'Korea',
         label: 'Korea',
         kind: 'region',
-        blurb: 'Royal observatories, Jeju basalt coasts, celadon kilns, and Seoul urbanism.',
+        blurb: 'Royal observatories, presidents (1900–Now), wartime history, and modern Korea deep-dives.',
         ...koreaStats
       },
       {
@@ -254,6 +321,13 @@ export function getSubcategoriesForCategory(
         kind: 'region',
         blurb: 'Buried Gold Rush ships, Beat poetry, fog physics, and bayfront engineering.',
         ...sfStats
+      },
+      {
+        id: 'United States',
+        label: 'United States',
+        kind: 'region',
+        blurb: 'Presidential audio documentaries from McKinley and Theodore Roosevelt to modern Washington.',
+        ...usStats
       }
     ];
 
@@ -296,9 +370,16 @@ export function filterAndPartitionItems(
   completedItems = {}
 ) {
   const rawItems = allItemsByCategory[selectedCategory] || [];
+  const isSeriesFilter =
+    selectedCategory === 'personal' &&
+    SERIES_DEFINITIONS.some((def) => def.id === selectedSubcategory);
+
   const filtered = rawItems.filter((item) => {
     if (!selectedSubcategory || selectedSubcategory === 'All') return true;
     if (selectedCategory === 'personal') {
+      if (isSeriesFilter) {
+        return item.seriesId === selectedSubcategory;
+      }
       if (selectedSubcategory === 'Korea' || selectedSubcategory === 'Korea (All 10)') {
         return item.region === 'Korea';
       }
@@ -308,10 +389,17 @@ export function filterAndPartitionItems(
       ) {
         return item.region === 'San Francisco';
       }
+      if (selectedSubcategory === 'United States') {
+        return item.region === 'United States';
+      }
       return item.themeGroup === selectedSubcategory || item.category === selectedSubcategory;
     }
     return item.genre === selectedSubcategory || item.rawGenre === selectedSubcategory;
   });
+
+  if (isSeriesFilter) {
+    filtered.sort((a, b) => (a.seriesOrder ?? 999) - (b.seriesOrder ?? 999));
+  }
 
   const unreadItems = [];
   const completedCategoryItems = [];
@@ -360,11 +448,22 @@ export function computeStreakStats(
   const nextGoldProgress =
     duo.todayCount > 0 ? duo.todayCount % 3 : totalCompleted % 3;
 
+  const pillarTotals = {
+    poem: (allItemsByCategory.poem || []).length,
+    story: (allItemsByCategory.story || []).length,
+    essay: (allItemsByCategory.essay || []).length,
+    personal: (allItemsByCategory.personal || []).length
+  };
+  const catalogTotal =
+    pillarTotals.poem + pillarTotals.story + pillarTotals.essay + pillarTotals.personal;
+
   return {
     poemsDone,
     storiesDone,
     essaysDone,
     personalDone,
+    pillarTotals,
+    catalogTotal,
     totalCompleted,
     categoriesTouched,
     goldNights,
@@ -441,11 +540,16 @@ export function getNextRecommendedPillar(allItemsByCategory, completedItems = {}
  */
 export const PERSONAL_STORY_AUDIO_RULE = {
   targetAudioMinutes: 20,
-  minAudioMinutes: 18,
-  maxAudioMinutes: 23,
+  minAudioMinutes: 6,
+  maxAudioMinutes: 35,
   speakingRateWpm: 150,
-  minBodyWords: 2100,
-  minTotalWords: 2750
+  minBodyWords: 550,
+  minTotalWords: 900,
+  tiers: {
+    compact: [14, 19],
+    standard: [20, 26],
+    epic: [27, 33]
+  }
 };
 
 export function computeStoryAudioMetrics(item) {

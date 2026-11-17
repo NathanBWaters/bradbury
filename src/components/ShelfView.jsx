@@ -23,9 +23,10 @@ export default function ShelfView({
   const categoryMeta =
     MAIN_CATEGORIES.find((c) => c.key === selectedCategory) || MAIN_CATEGORIES[1];
 
+  const matchedSub = (subcategories || []).find((s) => s.id === selectedSubcategory);
   const activeGenreLabel =
     selectedSubcategory && selectedSubcategory !== 'All'
-      ? selectedSubcategory
+      ? matchedSub?.label || selectedSubcategory
       : `All ${categoryMeta.pluralLabel || categoryMeta.shortLabel}`;
 
   return (
@@ -39,7 +40,7 @@ export default function ShelfView({
             onClick={onBackToGenres}
           >
             <ArrowLeft size={15} />
-            <span>{selectedCategory === 'personal' ? 'Places & Themes' : 'Genres'}</span>
+            <span>{selectedCategory === 'personal' ? 'Series & Places' : 'Genres'}</span>
           </button>
 
           <div className="shelf-breadcrumb-trail">
@@ -53,7 +54,9 @@ export default function ShelfView({
             </button>
             <span aria-hidden="true">/</span>
             <span className="breadcrumb-current">
-              {selectedSubcategory === 'All' ? 'All' : selectedSubcategory}
+              {selectedSubcategory === 'All'
+                ? 'All'
+                : matchedSub?.shortLabel || matchedSub?.label || selectedSubcategory}
             </span>
           </div>
         </div>
@@ -118,7 +121,7 @@ export default function ShelfView({
                 className={`night-chip ${isActive ? 'active' : ''}`}
                 onClick={() => onSelectSubcategory(sub.id)}
               >
-                <span>{sub.id === 'All' ? 'All' : sub.label}</span>
+                <span>{sub.id === 'All' ? 'All' : sub.shortLabel || sub.label}</span>
                 <span className="chip-count">{sub.unreadCount ?? sub.count}</span>
               </button>
             );

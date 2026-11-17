@@ -284,7 +284,7 @@ export default function SearchModal({
                 No titles matching <strong>&ldquo;{query.trim()}&rdquo;</strong>
                 {categoryFilter !== 'all'
                   ? ` in ${FILTER_TABS.find((t) => t.key === categoryFilter)?.label}`
-                  : ' in the 400-work library'}
+                  : ` in the ${totalAllCategories || 442}-work library`}
                 .
               </p>
 
@@ -297,7 +297,8 @@ export default function SearchModal({
                     onClick={() => setCategoryFilter('all')}
                   >
                     Show {totalAllCategories}{' '}
-                    {totalAllCategories === 1 ? 'match' : 'matches'} across all 400 works
+                    {totalAllCategories === 1 ? 'match' : 'matches'} across all{' '}
+                    {totalAllCategories || 442} works
                   </button>
                 )}
 

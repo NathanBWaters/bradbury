@@ -24,6 +24,8 @@
   --accent-korea-soft: hsl(352, 65%, 93%);
   --accent-sf: hsl(14, 78%, 44%);
   --accent-sf-soft: hsl(14, 80%, 92%);
+  --accent-us: hsl(214, 62%, 36%);
+  --accent-us-soft: hsl(214, 65%, 92%);
   --accent-success: hsl(152, 62%, 28%);
   --accent-success-soft: hsl(150, 55%, 90%);
 
@@ -81,6 +83,8 @@
   --accent-korea-soft: hsl(352, 36%, 19%);
   --accent-sf: hsl(16, 86%, 64%);
   --accent-sf-soft: hsl(16, 40%, 19%);
+  --accent-us: hsl(212, 82%, 68%);
+  --accent-us-soft: hsl(214, 42%, 19%);
   --accent-success: hsl(152, 62%, 54%);
   --accent-success-soft: hsl(152, 36%, 17%);
 
@@ -1473,6 +1477,11 @@ a {
   color: var(--accent-sf);
 }
 
+.slot-badge.us {
+  background: var(--accent-us-soft);
+  color: var(--accent-us);
+}
+
 .slot-meta-row {
   display: flex;
   align-items: center;
@@ -2632,11 +2641,181 @@ a {
 .slot-swap-btn,
 .breadcrumb-link-btn,
 .text-link-btn,
-.quiet-inline-btn {
+.quiet-inline-btn,
+.reader-series-pill {
   min-height: 28px;
   min-width: 28px;
   display: inline-flex;
   align-items: center;
+}
+
+/* Series Cards & Reader Continuation */
+.home-series-strip {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.15rem;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 1rem;
+}
+
+.home-series-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin-top: 0.7rem;
+}
+
+.home-series-card {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 0.95rem;
+  text-align: left;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.45rem;
+  min-height: 44px;
+  transition: border-color 0.16s ease, background 0.16s ease;
+}
+
+.home-series-card:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-sunken);
+}
+
+.home-series-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.home-series-region {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-flame);
+  font-weight: 600;
+}
+
+.home-series-title {
+  font-family: var(--font-display);
+  font-size: 1.18rem;
+  font-weight: 400;
+  line-height: 1.15;
+  color: var(--text-primary);
+}
+
+.home-series-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.series-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.series-choice-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.15rem 1.25rem;
+  text-align: left;
+  color: inherit;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.55rem;
+  min-height: 44px;
+  transition: border-color 0.16s ease, transform 0.14s ease;
+}
+
+.series-choice-card:hover {
+  border-color: var(--border-strong);
+}
+
+.series-choice-title {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.reader-series-pill {
+  border: 1px solid var(--border-strong);
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-align: left;
+  max-width: 100%;
+  cursor: pointer;
+}
+
+.reader-series-next-card {
+  margin-top: 1.5rem;
+  padding: 1.1rem 1.2rem;
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.reader-series-next-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  min-width: 0;
+  flex: 1 1 240px;
+}
+
+.reader-series-next-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent-flame);
+  font-weight: 600;
+}
+
+.reader-series-next-meta {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+  .home-series-grid,
+  .series-choice-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.7rem;
+  }
+
+  .series-choice-card {
+    padding: 1.05rem 1.1rem;
+  }
 }
 
 button:active:not(:disabled) {

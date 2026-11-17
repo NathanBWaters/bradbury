@@ -139,6 +139,8 @@ export default function JournalView({
                 : cat.key === 'essay'
                 ? streakStats.essaysDone
                 : streakStats.personalDone;
+            const totalForPillar = streakStats.pillarTotals?.[cat.key] || 100;
+            const fillPct = totalForPillar > 0 ? Math.min(100, (done / totalForPillar) * 100) : 0;
             return (
               <button
                 key={cat.key}
@@ -148,12 +150,12 @@ export default function JournalView({
               >
                 <div className="journal-pillar-top">
                   <strong>{cat.shortLabel}</strong>
-                  <span>{done} / 100</span>
+                  <span>{done} / {totalForPillar}</span>
                 </div>
                 <div className="journal-progress-track" aria-hidden="true">
                   <div
                     className="journal-progress-fill"
-                    style={{ width: `${Math.min(100, done)}%` }}
+                    style={{ width: `${fillPct}%` }}
                   />
                 </div>
               </button>

@@ -27,6 +27,11 @@ export default function ChooseTypeView({
   onSelectType,
   onOpenSearch
 }) {
+  const totalWorksCount = MAIN_CATEGORIES.reduce(
+    (sum, cat) => sum + (allItemsByCategory[cat.key]?.length || 0),
+    0
+  );
+
   return (
     <div className="funnel-page choose-type-page" id="choose-type-view">
       <nav className="funnel-breadcrumb-bar with-progress" aria-label="Funnel navigation">
@@ -67,7 +72,7 @@ export default function ChooseTypeView({
             <span>Search for a specific title, author, or place…</span>
           </span>
           <span className="explore-search-bar-right">
-            <span>400 titles</span>
+            <span>{totalWorksCount || 442} titles</span>
           </span>
         </button>
       )}
@@ -111,10 +116,10 @@ export default function ChooseTypeView({
               <div className="type-choice-footer">
                 <span className="type-choice-meta">
                   {unreadCount} unread •{' '}
-                  {cat.key === 'personal' ? '2 places + 5 themes' : `${filterCount} genres`}
+                  {cat.key === 'personal' ? '3 series + 3 places + 5 themes' : `${filterCount} genres`}
                 </span>
                 <span className="type-choice-cta">
-                  <span>{cat.key === 'personal' ? 'Pick Place' : 'Pick Genre'}</span>
+                  <span>{cat.key === 'personal' ? 'Pick Series & Place' : 'Pick Genre'}</span>
                   <ArrowRight size={15} />
                 </span>
               </div>

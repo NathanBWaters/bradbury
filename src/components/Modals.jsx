@@ -58,7 +58,7 @@ export function ExternalBookModal({ onClose, onLogExternalReading, initialTitle 
             <option value="story">Short Story</option>
             <option value="poem">Poem</option>
             <option value="essay">Essay</option>
-            <option value="personal">Personal (Korea / San Francisco)</option>
+            <option value="personal">Chronicles &amp; Series (Korea / U.S. / SF)</option>
           </select>
         </div>
 
@@ -254,7 +254,9 @@ export function ProfileSettingsModal({
   );
 }
 
-export function PwaInstallModal({ deferredPrompt, onTriggerInstall, onClose }) {
+export function PwaInstallModal({ deferredPrompt, onTriggerInstall, onClose, catalogSummary }) {
+  const totalWorks = catalogSummary?.totalWorks || 442;
+  const personalCount = catalogSummary?.personalCount || 142;
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
@@ -276,7 +278,7 @@ export function PwaInstallModal({ deferredPrompt, onTriggerInstall, onClose }) {
             </h3>
             <span className="pwa-status-pill">
               <CheckCircle2 size={13} />
-              Offline Service Worker Active • 400 Works Ready
+              Offline Service Worker Active • {totalWorks} Works Ready
             </span>
           </div>
         </div>
@@ -284,7 +286,7 @@ export function PwaInstallModal({ deferredPrompt, onTriggerInstall, onClose }) {
         <p className="modal-subtext" style={{ marginTop: '0.85rem' }}>
           Install <strong>Bradbury 1000</strong> to your phone&rsquo;s Home Screen for a full-screen,
           distraction-free bedside reading experience with complete offline access to all 100 Poems,
-          100 Short Stories, 100 Essays, and 100 Korea &amp; San Francisco Chronicles.
+          100 Short Stories, 100 Essays, and {personalCount} Korea, U.S. &amp; San Francisco Chronicles &amp; Series.
         </p>
 
         <div className="pwa-steps-grid">

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallba
 import { Sparkles } from 'lucide-react';
 import poemsAndEssays from './data/poemsAndEssays.json';
 import storiesAndPlaces from './data/storiesAndPlaces.json';
+import narrativeSeries from './data/narrativeSeries.json';
 import { buildEpubBlob, downloadEpubBlob } from './utils/epubGenerator.js';
 import {
   MAIN_CATEGORIES,
@@ -128,7 +129,7 @@ function saveState(state) {
 export default function App() {
   const [userState, setUserState] = useState(() => loadState());
   const allItemsByCategory = useMemo(
-    () => buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces),
+    () => buildNormalizedCatalog(poemsAndEssays, storiesAndPlaces, narrativeSeries),
     []
   );
   const initialRoute = useMemo(
@@ -468,6 +469,33 @@ export default function App() {
     () => getNextRecommendedPillar(allItemsByCategory, userState.completedItems),
     [allItemsByCategory, userState.completedItems]
   );
+
+  const featuredSeries = useMemo(
+    () =>
+      getSubcategoriesForCategory(
+        allItemsByCategory,
+        'personal',
+        userState.completedItems
+      ).filter((s) => s.kind === 'series'),
+    [allItemsByCategory, userState.completedItems]
+  );
+
+  const activeSeriesNav = useMemo(() => {
+    const currentItem = activeReader?.item;
+    if (!currentItem?.seriesId) return null;
+    const ordered = (allItemsByCategory.personal || [])
+      .filter((x) => x.seriesId === currentItem.seriesId)
+      .sort((a, b) => (a.seriesOrder ?? 999) - (b.seriesOrder ?? 999));
+    const idx = ordered.findIndex((x) => x.id === currentItem.id);
+    return {
+      seriesId: currentItem.seriesId,
+      seriesTitle: currentItem.seriesTitle,
+      index: idx,
+      total: ordered.length,
+      prevItem: idx > 0 ? ordered[idx - 1] : null,
+      nextItem: idx >= 0 && idx < ordered.length - 1 ? ordered[idx + 1] : null
+    };
+  }, [activeReader, allItemsByCategory]);
 
   const quartetEntries = useMemo(() => {
     const freshDeal = dealTonightQuartet(
@@ -889,8 +917,13 @@ export default function App() {
             activeReader={activeReader}
             isCompleted={Boolean(userState.completedItems[activeReader.item.id]?.completed)}
             profile={userState.profile}
+            seriesNav={activeSeriesNav}
             onUpdateProfile={handleUpdateProfile}
             onCloseReader={closeReader}
+            onOpenReader={openReader}
+            onSelectSeries={(seriesId) =>
+              navigateTo(shelfPath('personal', seriesId), { playPop: true })
+            }
             onShareElevenReader={handleElevenReaderShare}
             onDownloadEpub={handleDownloadSingleEpub}
             onToggleComplete={toggleItemCompleted}
@@ -994,9 +1027,13 @@ export default function App() {
             streakStats={streakStats}
             unreadCounts={unreadCounts}
             nextRecommendation={nextRecommendation}
+            featuredSeries={featuredSeries}
             soundEnabled={soundEnabled}
             onChooseTonightQuartet={() => navigateTo(tonightPath(), { playPop: true })}
             onChooseCustomPath={() => navigateTo(chooseTypePath(), { playPop: true })}
+            onSelectSeries={(seriesId) =>
+              navigateTo(shelfPath('personal', seriesId), { playPop: true })
+            }
             onOpenSurpriseNow={() => {
               const pick =
                 nextRecommendation?.item ||
@@ -1083,6 +1120,10 @@ export default function App() {
       {showPwaModal && (
         <PwaInstallModal
           deferredPrompt={deferredPrompt}
+          catalogSummary={{
+            totalWorks: streakStats.catalogTotal,
+            personalCount: streakStats.pillarTotals?.personal
+          }}
           onTriggerInstall={async () => {
             if (deferredPrompt) {
               deferredPrompt.prompt();
